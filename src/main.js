@@ -1,11 +1,12 @@
 /**
- * main.js - Keramitra Interactive Screening Console
- * Fully manual UI driving image generation, analysis, rule engine, and approval queue.
+ * main.js - Keramitra Interactive Screening Console & WebMCP Host
+ * Fully manual UI driving image generation, analysis, rule engine, and WebMCP tools.
  */
 
 import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS } from './synth.js';
 import { analyzeRings } from './analyze.js';
 import { evaluateReferral, THRESHOLDS, REASON_CODES, VERDICTS } from './rules.js';
+import { registerWebMCPTools, unregisterWebMCPTools } from './tools.js';
 
 // Application State
 const state = {
@@ -271,6 +272,7 @@ function evaluateCurrentState() {
     measurements: state.measurements,
   });
   updateUI();
+  return state.referralResult;
 }
 
 /**
@@ -305,6 +307,8 @@ function loadCase(caseId) {
 
   // Evaluate referral rules
   evaluateCurrentState();
+
+  return { eye: state.currentEye, caseId };
 }
 
 /**
@@ -327,12 +331,13 @@ function renderApprovalQueue() {
   state.approvalQueue.forEach((item) => {
     const card = document.createElement('div');
     card.className = `queue-card status-${item.status.toLowerCase()}`;
+    card.id = `queue-card-${item.id}`;
 
     const header = document.createElement('div');
     header.className = 'card-header';
     header.innerHTML = `
       <span class="card-title">${item.caseId} &bull; ${item.eye}</span>
-      <span class="card-time">${item.time}</span>
+      <span class="card-time">${item.time} &bull; ID: ${item.id}</span>
     `;
     card.appendChild(header);
 
@@ -343,6 +348,14 @@ function renderApprovalQueue() {
       <span class="meta-label">K2: ${item.measurements.K2}D &bull; Pachy: ${item.measurements.pachymetry}µm</span>
     `;
     card.appendChild(verdictRow);
+
+    if (item.proposedAction) {
+      const actionText = document.createElement('div');
+      actionText.className = 'meta-label';
+      actionText.style.color = 'var(--text-primary)';
+      actionText.textContent = `Action: ${item.proposedAction}`;
+      card.appendChild(actionText);
+    }
 
     if (item.reasonCodes.length > 0) {
       const reasons = document.createElement('div');
@@ -388,19 +401,24 @@ function renderApprovalQueue() {
 }
 
 /**
- * Queue the current referral decision into the approval list.
+ * Queue a referral decision into the approval list.
  */
-function queueCurrentReferral() {
-  if (!state.referralResult) return;
+function queueCurrentReferral(proposedAction = '') {
+  if (!state.referralResult) return null;
 
   const now = new Date();
   const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
 
+  const defaultAction = state.referralResult.verdict === VERDICTS.REPEAT_SCAN
+    ? 'Order repeat topography capture'
+    : 'Refer for specialist corneal assessment';
+
   const item = {
-    id: Date.now(),
+    id: `req_${Date.now()}`,
     caseId: state.currentCase,
     eye: state.currentEye,
     time: timeStr,
+    proposedAction: proposedAction || defaultAction,
     verdict: state.referralResult.verdict,
     reasonCodes: [...state.referralResult.reasonCodes],
     measurements: { ...state.measurements },
@@ -410,6 +428,7 @@ function queueCurrentReferral() {
 
   state.approvalQueue.unshift(item);
   renderApprovalQueue();
+  return item;
 }
 
 /**
@@ -450,7 +469,7 @@ function setupEventListeners() {
     drawCanvas();
   });
 
-  elements.btnQueueReferral.addEventListener('click', queueCurrentReferral);
+  elements.btnQueueReferral.addEventListener('click', () => queueCurrentReferral());
 
   // Input changes
   const inputs = [
@@ -466,7 +485,94 @@ function setupEventListeners() {
   });
 }
 
+// Controller API passed to WebMCP tools to guarantee single unified logic path
+export const appController = {
+  loadCase: (caseId) => loadCase(caseId),
+  analyzeActiveCase: () => {
+    if (state.cachedImageData) {
+      state.imageResult = analyzeRings(state.cachedImageData);
+      evaluateCurrentState();
+    }
+    return state.imageResult;
+  },
+  getMeasurements: () => ({ ...state.measurements }),
+  evaluateActiveReferral: () => evaluateCurrentState(),
+  getState: () => ({ ...state }),
+  queueReferralRequest: ({ caseId, proposedAction }) => {
+    if (caseId && caseId !== state.currentCase) {
+      loadCase(caseId);
+    }
+    return queueCurrentReferral(proposedAction);
+  },
+  finalizeReport: ({ caseId, approvalToken }) => {
+    const queueItem = state.approvalQueue.find((item) => item.id === approvalToken);
+    if (!queueItem) {
+      return {
+        status: 'blocked',
+        error: `Cannot finalize report: No approval request found for token '${approvalToken}'. Call request_approval first.`,
+        caseId,
+        approvalToken,
+      };
+    }
+
+    if (queueItem.status === 'PENDING') {
+      return {
+        status: 'blocked',
+        error: `Cannot finalize report: Request '${approvalToken}' is still pending clinician review in the Approval Queue.`,
+        caseId,
+        approvalToken,
+        queueStatus: 'PENDING',
+      };
+    }
+
+    if (queueItem.status === 'REJECTED') {
+      return {
+        status: 'blocked',
+        error: `Cannot finalize report: Request '${approvalToken}' was rejected by clinician.`,
+        caseId,
+        approvalToken,
+        queueStatus: 'REJECTED',
+      };
+    }
+
+    // Status is APPROVED
+    return {
+      status: 'finalized',
+      caseId: queueItem.caseId,
+      approvalToken,
+      verdict: queueItem.verdict,
+      reasonCodes: queueItem.reasonCodes,
+      measurements: queueItem.measurements,
+      imageMetrics: queueItem.imageResult?.metrics,
+      finalizedAt: new Date().toISOString(),
+      message: 'Screening report successfully finalized with verified human clinical sign-off.',
+    };
+  },
+};
+
 // Initial bootstrap
 setupEventListeners();
 loadCase(CASES.CASE_A);
 renderApprovalQueue();
+
+// Register WebMCP Tools
+const registrationResult = registerWebMCPTools(appController);
+
+// Update WebMCP status badge & setup instructions
+const webmcpBadge = document.getElementById('webmcp-badge');
+if (webmcpBadge) {
+  if (registrationResult.modelContextAvailable) {
+    webmcpBadge.textContent = `ACTIVE [${registrationResult.toolsCount} TOOLS]`;
+    webmcpBadge.className = 'webmcp-badge active';
+    webmcpBadge.title = 'WebMCP Document Model Context API active and connected.';
+  } else {
+    webmcpBadge.textContent = `SHIM [${registrationResult.toolsCount} TOOLS]`;
+    webmcpBadge.className = 'webmcp-badge shimmed';
+    webmcpBadge.title = 'Native ModelContext not detected. Enable chrome://flags/#enable-model-context in Chrome 146+ or use WebMCP shim.';
+  }
+}
+
+// Teardown registration on window unload
+window.addEventListener('beforeunload', () => {
+  unregisterWebMCPTools();
+});

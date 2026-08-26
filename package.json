@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node src/analyze.test.js",
-    "test:rules": "node src/rules.test.js"
+    "test:rules": "node src/rules.test.js",
+    "test:tools": "node src/tools.test.js"
   },
   "devDependencies": {
     "vite": "^8.2.2"

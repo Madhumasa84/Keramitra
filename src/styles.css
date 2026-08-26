@@ -122,6 +122,27 @@ html, body {
   font-size: 11px;
 }
 
+.webmcp-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-subtle);
+  color: var(--text-dim);
+}
+
+.webmcp-badge.active {
+  color: var(--verdict-routine-text);
+  border-color: var(--verdict-routine-border);
+  background: var(--verdict-routine-bg);
+}
+
+.webmcp-badge.shimmed {
+  color: var(--accent-action);
+  border-color: var(--border-strong);
+  background: var(--bg-input);
+}
+
 /* Main Application Layout (Three Columns) */
 .app-layout {
   display: grid;
