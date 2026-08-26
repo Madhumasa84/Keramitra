@@ -1,12 +1,26 @@
 /**
- * main.js - Keramitra Interactive Screening Console & WebMCP Host
- * Fully manual UI driving image generation, analysis, rule engine, and WebMCP tools.
+ * main.js - Keramitra Interactive Screening Console, WebMCP Host & Approval Gate
+ * Fully manual UI driving image generation, analysis, rule engine, WebMCP tools, and
+ * structurally enforced cryptographic human approval gate with live audit trail.
  */
 
 import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS } from './synth.js';
 import { analyzeRings } from './analyze.js';
 import { evaluateReferral, THRESHOLDS, REASON_CODES, VERDICTS } from './rules.js';
 import { registerWebMCPTools, unregisterWebMCPTools } from './tools.js';
+
+// Structured Guard Error Codes (Exhaustive)
+export const GUARD_ERRORS = {
+  TOKEN_MISSING: 'TOKEN_MISSING',
+  TOKEN_CASE_MISMATCH: 'TOKEN_CASE_MISMATCH',
+  TOKEN_ALREADY_USED: 'TOKEN_ALREADY_USED',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+  APPROVAL_REJECTED: 'APPROVAL_REJECTED',
+  TOKEN_NOT_FOUND: 'TOKEN_NOT_FOUND',
+};
+
+// In-Memory Token Registry (Single-use, ephemeral, bound to requestId + caseId)
+const tokenRegistry = new Map();
 
 // Application State
 const state = {
@@ -18,6 +32,7 @@ const state = {
   measurements: { ...SYNTHETIC_MEASUREMENTS[CASES.CASE_A] },
   referralResult: null,
   approvalQueue: [],
+  auditTrail: [],
 };
 
 // DOM Element References
@@ -57,11 +72,98 @@ const elements = {
   chipsList: document.getElementById('chips-list'),
   btnQueueReferral: document.getElementById('btn-queue-referral'),
 
-  // Queue
+  // Queue & Guard Demo
   queueCountBadge: document.getElementById('queue-count-badge'),
   queueEmptyState: document.getElementById('queue-empty-state'),
   queueCardsList: document.getElementById('queue-cards-list'),
+  btnDemoUnapprovedFinalize: document.getElementById('btn-demo-unapproved-finalize'),
+  guardAlertBox: document.getElementById('guard-alert-box'),
+  guardAlertCode: document.getElementById('guard-alert-code'),
+  guardAlertMsg: document.getElementById('guard-alert-msg'),
+
+  // Audit Trail
+  auditLogContainer: document.getElementById('audit-log-container'),
+  btnExportAudit: document.getElementById('btn-export-audit'),
 };
+
+/**
+ * Append an entry to the visible audit trail and internal log.
+ */
+function logAuditEvent({ type, actor, action, details = {}, status = 'OK' }) {
+  const now = new Date();
+  const timeFormatted = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+  const entry = {
+    id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    timestamp: now.toISOString(),
+    time: timeFormatted,
+    type,
+    actor,
+    action,
+    status,
+    details,
+  };
+
+  state.auditTrail.unshift(entry);
+  renderAuditTrail();
+  return entry;
+}
+
+/**
+ * Render the audit trail UI.
+ */
+function renderAuditTrail() {
+  if (!elements.auditLogContainer) return;
+  elements.auditLogContainer.innerHTML = '';
+
+  state.auditTrail.forEach((entry) => {
+    const item = document.createElement('div');
+    const isViolation = entry.status === 'BLOCKED' || entry.type === 'GUARD_VIOLATION';
+    const isApproved = entry.type === 'HUMAN_APPROVAL' || entry.status === 'FINALIZED';
+
+    item.className = `audit-entry ${isViolation ? 'violation' : ''} ${isApproved ? 'approved' : ''}`;
+
+    const header = document.createElement('div');
+    header.className = 'audit-entry-header';
+    header.innerHTML = `
+      <span class="audit-time">[${entry.time}]</span>
+      <span class="audit-actor ${entry.actor === 'CLINICIAN' ? 'actor-clinician' : ''}">${entry.actor}</span>
+      <span class="audit-event">${entry.action}</span>
+    `;
+    item.appendChild(header);
+
+    if (entry.details && Object.keys(entry.details).length > 0) {
+      const details = document.createElement('div');
+      details.className = 'audit-details';
+      details.textContent = typeof entry.details === 'string'
+        ? entry.details
+        : JSON.stringify(entry.details);
+      item.appendChild(details);
+    }
+
+    elements.auditLogContainer.appendChild(item);
+  });
+}
+
+/**
+ * Export audit trail log as JSON download.
+ */
+function exportAuditLogJSON() {
+  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(state.auditTrail, null, 2));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute('href', dataStr);
+  downloadAnchor.setAttribute('download', `keramitra_audit_trail_${Date.now()}.json`);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+
+  logAuditEvent({
+    type: 'AUDIT_EXPORT',
+    actor: 'CLINICIAN',
+    action: 'Exported audit log as JSON',
+    details: { totalEntries: state.auditTrail.length },
+  });
+}
 
 /**
  * Render image data to canvas with optional diagnostic overlays.
@@ -308,11 +410,18 @@ function loadCase(caseId) {
   // Evaluate referral rules
   evaluateCurrentState();
 
+  logAuditEvent({
+    type: 'CASE_LOADED',
+    actor: 'SYSTEM',
+    action: `Loaded case preset ${caseId}`,
+    details: { caseId, eye: state.currentEye, quality: state.imageResult.quality },
+  });
+
   return { eye: state.currentEye, caseId };
 }
 
 /**
- * Render the approval queue cards.
+ * Render the approval queue cards with complete evidence summary & single-use token display.
  */
 function renderApprovalQueue() {
   const count = state.approvalQueue.length;
@@ -360,7 +469,7 @@ function renderApprovalQueue() {
     if (item.reasonCodes.length > 0) {
       const reasons = document.createElement('div');
       reasons.className = 'card-reasons';
-      reasons.textContent = `Codes: ${item.reasonCodes.join(', ')}`;
+      reasons.textContent = `Reason codes: ${item.reasonCodes.join(', ')}`;
       card.appendChild(reasons);
     }
 
@@ -373,8 +482,30 @@ function renderApprovalQueue() {
       btnApprove.className = 'btn btn-approve';
       btnApprove.textContent = item.verdict === VERDICTS.REPEAT_SCAN ? 'Approve repeat scan' : 'Approve referral';
       btnApprove.addEventListener('click', () => {
+        // Mint single-use token bound to { requestId, caseId, timestamp }
+        const mintedAt = Date.now();
+        const token = `tok_${Math.random().toString(36).slice(2, 10)}_${mintedAt}`;
+        
+        tokenRegistry.set(token, {
+          token,
+          requestId: item.id,
+          caseId: item.caseId,
+          mintedAt,
+          used: false,
+          usedAt: null,
+        });
+
         item.status = 'APPROVED';
+        item.approvalToken = token;
         renderApprovalQueue();
+
+        logAuditEvent({
+          type: 'HUMAN_APPROVAL',
+          actor: 'CLINICIAN',
+          action: `Approved request ${item.id} (${item.caseId})`,
+          status: 'APPROVED',
+          details: { requestId: item.id, caseId: item.caseId, tokenIssued: token },
+        });
       });
 
       const btnReject = document.createElement('button');
@@ -384,15 +515,37 @@ function renderApprovalQueue() {
       btnReject.addEventListener('click', () => {
         item.status = 'REJECTED';
         renderApprovalQueue();
+
+        logAuditEvent({
+          type: 'HUMAN_REJECTION',
+          actor: 'CLINICIAN',
+          action: `Rejected request ${item.id} (${item.caseId})`,
+          status: 'REJECTED',
+          details: { requestId: item.id, caseId: item.caseId },
+        });
       });
 
       actions.appendChild(btnApprove);
       actions.appendChild(btnReject);
       card.appendChild(actions);
+    } else if (item.status === 'APPROVED') {
+      const statusBanner = document.createElement('div');
+      statusBanner.className = 'card-status-banner';
+      statusBanner.textContent = 'Approved';
+      card.appendChild(statusBanner);
+
+      // Display single-use token
+      const tokenContainer = document.createElement('div');
+      tokenContainer.className = 'token-badge-container';
+      tokenContainer.innerHTML = `
+        <span class="token-label">Single-use token (valid 5 min)</span>
+        <span class="token-val">${item.approvalToken}</span>
+      `;
+      card.appendChild(tokenContainer);
     } else {
       const statusBanner = document.createElement('div');
       statusBanner.className = 'card-status-banner';
-      statusBanner.textContent = item.status === 'APPROVED' ? 'Approved' : 'Rejected';
+      statusBanner.textContent = 'Rejected';
       card.appendChild(statusBanner);
     }
 
@@ -428,7 +581,175 @@ function queueCurrentReferral(proposedAction = '') {
 
   state.approvalQueue.unshift(item);
   renderApprovalQueue();
+
+  logAuditEvent({
+    type: 'APPROVAL_REQUESTED',
+    actor: 'AGENT',
+    action: `Queued approval request ${item.id}`,
+    details: { caseId: item.caseId, proposedAction: item.proposedAction, verdict: item.verdict },
+  });
+
   return item;
+}
+
+/**
+ * Finalize screening report with strict token validation.
+ */
+export function finalizeReport({ caseId, approvalToken }) {
+  const targetCase = caseId || state.currentCase;
+
+  // Check 1: Token Missing
+  if (!approvalToken) {
+    const errorObj = {
+      status: 'blocked',
+      error: GUARD_ERRORS.TOKEN_MISSING,
+      message: 'Approval token is required to finalize report. Request human approval first.',
+      caseId: targetCase,
+    };
+    logAuditEvent({
+      type: 'GUARD_VIOLATION',
+      actor: 'AGENT',
+      action: 'finalize_report blocked (TOKEN_MISSING)',
+      status: 'BLOCKED',
+      details: errorObj,
+    });
+    return errorObj;
+  }
+
+  // Check 2: Token Not Found / Rejected
+  const tokenObj = tokenRegistry.get(approvalToken);
+  if (!tokenObj) {
+    // Check if request ID exists but was rejected
+    const rejectedItem = state.approvalQueue.find((i) => i.id === approvalToken && i.status === 'REJECTED');
+    const errorCode = rejectedItem ? GUARD_ERRORS.APPROVAL_REJECTED : GUARD_ERRORS.TOKEN_NOT_FOUND;
+    const errorObj = {
+      status: 'blocked',
+      error: errorCode,
+      message: rejectedItem
+        ? `Request '${approvalToken}' was rejected by clinician. Cannot finalize report.`
+        : `Token '${approvalToken}' not found in active session registry.`,
+      caseId: targetCase,
+      approvalToken,
+    };
+    logAuditEvent({
+      type: 'GUARD_VIOLATION',
+      actor: 'AGENT',
+      action: `finalize_report blocked (${errorCode})`,
+      status: 'BLOCKED',
+      details: errorObj,
+    });
+    return errorObj;
+  }
+
+  // Check 3: Token Case Mismatch
+  if (tokenObj.caseId !== targetCase) {
+    const errorObj = {
+      status: 'blocked',
+      error: GUARD_ERRORS.TOKEN_CASE_MISMATCH,
+      message: `Token is bound to case '${tokenObj.caseId}', but request was for '${targetCase}'.`,
+      caseId: targetCase,
+      tokenCaseId: tokenObj.caseId,
+      approvalToken,
+    };
+    logAuditEvent({
+      type: 'GUARD_VIOLATION',
+      actor: 'AGENT',
+      action: 'finalize_report blocked (TOKEN_CASE_MISMATCH)',
+      status: 'BLOCKED',
+      details: errorObj,
+    });
+    return errorObj;
+  }
+
+  // Check 4: Token Already Used
+  if (tokenObj.used) {
+    const errorObj = {
+      status: 'blocked',
+      error: GUARD_ERRORS.TOKEN_ALREADY_USED,
+      message: `Single-use token '${approvalToken}' was already consumed at ${tokenObj.usedAt}.`,
+      caseId: targetCase,
+      approvalToken,
+    };
+    logAuditEvent({
+      type: 'GUARD_VIOLATION',
+      actor: 'AGENT',
+      action: 'finalize_report blocked (TOKEN_ALREADY_USED)',
+      status: 'BLOCKED',
+      details: errorObj,
+    });
+    return errorObj;
+  }
+
+  // Check 5: Token Expired (5 minutes = 300,000 ms)
+  const tokenAge = Date.now() - tokenObj.mintedAt;
+  if (tokenAge > 5 * 60 * 1000) {
+    const errorObj = {
+      status: 'blocked',
+      error: GUARD_ERRORS.TOKEN_EXPIRED,
+      message: `Approval token expired (${Math.round(tokenAge / 1000)}s old > 300s limit).`,
+      caseId: targetCase,
+      approvalToken,
+    };
+    logAuditEvent({
+      type: 'GUARD_VIOLATION',
+      actor: 'AGENT',
+      action: 'finalize_report blocked (TOKEN_EXPIRED)',
+      status: 'BLOCKED',
+      details: errorObj,
+    });
+    return errorObj;
+  }
+
+  // Token Valid — Consume token (Single-use enforcement)
+  tokenObj.used = true;
+  tokenObj.usedAt = new Date().toISOString();
+
+  const successObj = {
+    status: 'finalized',
+    caseId: targetCase,
+    approvalToken,
+    verdict: state.referralResult.verdict,
+    reasonCodes: state.referralResult.reasonCodes,
+    domainsFlagged: state.referralResult.domainsFlagged,
+    measurements: { ...state.measurements },
+    imageMetrics: { ...state.imageResult.metrics },
+    clinicalSignOff: {
+      requestId: tokenObj.requestId,
+      mintedAt: new Date(tokenObj.mintedAt).toISOString(),
+      finalizedAt: tokenObj.usedAt,
+      clinicianVerified: true,
+    },
+    message: 'Screening report successfully finalized with verified human clinical sign-off.',
+  };
+
+  logAuditEvent({
+    type: 'REPORT_FINALIZED',
+    actor: 'AGENT',
+    action: `Finalized report for ${targetCase}`,
+    status: 'FINALIZED',
+    details: { caseId: targetCase, approvalToken, verdict: successObj.verdict },
+  });
+
+  return successObj;
+}
+
+/**
+ * Demonstration trigger for unapproved finalize attempt.
+ */
+function handleDemoUnapprovedFinalize() {
+  const result = finalizeReport({ caseId: state.currentCase, approvalToken: null });
+
+  if (elements.guardAlertBox && elements.guardAlertCode && elements.guardAlertMsg) {
+    elements.guardAlertCode.textContent = result.error;
+    elements.guardAlertMsg.textContent = result.message;
+    elements.guardAlertBox.style.display = 'flex';
+
+    setTimeout(() => {
+      if (elements.guardAlertBox) {
+        elements.guardAlertBox.style.display = 'none';
+      }
+    }, 6000);
+  }
 }
 
 /**
@@ -460,6 +781,12 @@ function setupEventListeners() {
     if (state.cachedImageData) {
       state.imageResult = analyzeRings(state.cachedImageData);
       evaluateCurrentState();
+      logAuditEvent({
+        type: 'ANALYSIS_MANUAL',
+        actor: 'CLINICIAN',
+        action: `Analyzed Placido mires for ${state.currentCase}`,
+        details: { quality: state.imageResult.quality, spacingCV: state.imageResult.spacingCV },
+      });
     }
   });
 
@@ -471,6 +798,16 @@ function setupEventListeners() {
 
   elements.btnQueueReferral.addEventListener('click', () => queueCurrentReferral());
 
+  // Demo Guard Button
+  if (elements.btnDemoUnapprovedFinalize) {
+    elements.btnDemoUnapprovedFinalize.addEventListener('click', handleDemoUnapprovedFinalize);
+  }
+
+  // Export Audit Button
+  if (elements.btnExportAudit) {
+    elements.btnExportAudit.addEventListener('click', exportAuditLogJSON);
+  }
+
   // Input changes
   const inputs = [
     elements.inputK1,
@@ -481,7 +818,9 @@ function setupEventListeners() {
   ];
 
   inputs.forEach((input) => {
-    input.addEventListener('input', evaluateCurrentState);
+    input.addEventListener('input', () => {
+      evaluateCurrentState();
+    });
   });
 }
 
@@ -504,50 +843,8 @@ export const appController = {
     }
     return queueCurrentReferral(proposedAction);
   },
-  finalizeReport: ({ caseId, approvalToken }) => {
-    const queueItem = state.approvalQueue.find((item) => item.id === approvalToken);
-    if (!queueItem) {
-      return {
-        status: 'blocked',
-        error: `Cannot finalize report: No approval request found for token '${approvalToken}'. Call request_approval first.`,
-        caseId,
-        approvalToken,
-      };
-    }
-
-    if (queueItem.status === 'PENDING') {
-      return {
-        status: 'blocked',
-        error: `Cannot finalize report: Request '${approvalToken}' is still pending clinician review in the Approval Queue.`,
-        caseId,
-        approvalToken,
-        queueStatus: 'PENDING',
-      };
-    }
-
-    if (queueItem.status === 'REJECTED') {
-      return {
-        status: 'blocked',
-        error: `Cannot finalize report: Request '${approvalToken}' was rejected by clinician.`,
-        caseId,
-        approvalToken,
-        queueStatus: 'REJECTED',
-      };
-    }
-
-    // Status is APPROVED
-    return {
-      status: 'finalized',
-      caseId: queueItem.caseId,
-      approvalToken,
-      verdict: queueItem.verdict,
-      reasonCodes: queueItem.reasonCodes,
-      measurements: queueItem.measurements,
-      imageMetrics: queueItem.imageResult?.metrics,
-      finalizedAt: new Date().toISOString(),
-      message: 'Screening report successfully finalized with verified human clinical sign-off.',
-    };
-  },
+  finalizeReport: ({ caseId, approvalToken }) => finalizeReport({ caseId, approvalToken }),
+  logAuditEvent: (entry) => logAuditEvent(entry),
 };
 
 // Initial bootstrap

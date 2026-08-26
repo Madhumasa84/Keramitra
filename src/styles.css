@@ -769,6 +769,31 @@ html, body {
   text-align: center;
 }
 
+.token-badge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  background: #08110b;
+  border: 1px dashed var(--verdict-routine-border);
+}
+
+.token-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--verdict-routine-text);
+  letter-spacing: 0.05em;
+}
+
+.token-val {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #a8f0b4;
+  word-break: break-all;
+  user-select: all;
+}
+
 .card-actions {
   display: flex;
   gap: 6px;
@@ -803,6 +828,155 @@ html, body {
 .btn-reject:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+/* Guard Demonstration Section */
+.guard-demo-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.btn-demo-guard {
+  background: var(--bg-subtle);
+  border: 1px solid var(--verdict-refer-border);
+  color: var(--verdict-refer-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.btn-demo-guard:hover {
+  background: var(--verdict-refer-bg);
+}
+
+.guard-alert-box {
+  background: var(--verdict-refer-bg);
+  border: 1px solid var(--verdict-refer-border);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guard-alert-code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--verdict-refer-text);
+}
+
+.guard-alert-msg {
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+/* Audit Trail Section */
+.audit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-hairline);
+  flex: 1;
+  min-height: 160px;
+}
+
+.audit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-subtle-sm {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.btn-subtle-sm:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.audit-log-container {
+  background: #080a0e;
+  border: 1px solid var(--border-hairline);
+  padding: 6px;
+  height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.audit-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #141922;
+  line-height: 1.35;
+}
+
+.audit-entry:last-child {
+  border-bottom: none;
+}
+
+.audit-entry-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.audit-time {
+  color: var(--text-dim);
+}
+
+.audit-actor {
+  color: var(--accent-action);
+  font-weight: 600;
+}
+
+.audit-actor.actor-clinician {
+  color: var(--verdict-routine-text);
+}
+
+.audit-event {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.audit-entry.violation {
+  background: rgba(224, 122, 60, 0.12);
+  border-left: 2px solid var(--verdict-refer-text);
+}
+
+.audit-entry.violation .audit-event {
+  color: var(--verdict-refer-text);
+}
+
+.audit-entry.approved {
+  background: rgba(82, 196, 106, 0.08);
+  border-left: 2px solid var(--verdict-routine-text);
+}
+
+.audit-details {
+  color: var(--text-primary);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* Persistent System Footer */

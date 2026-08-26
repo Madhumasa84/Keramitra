@@ -228,7 +228,7 @@
         </div>
       </section>
 
-      <!-- RIGHT COLUMN: Approval Queue -->
+      <!-- RIGHT COLUMN: Approval Queue & Audit Trail -->
       <section class="panel panel-queue" aria-labelledby="heading-queue">
         <div class="panel-header">
           <h2 id="heading-queue" class="panel-title">Approval queue</h2>
@@ -240,6 +240,31 @@
             Pending clinical approval requests and referral sign-offs will appear here when submitted from the evidence panel.
           </div>
           <div class="queue-cards-list" id="queue-cards-list" role="list"></div>
+
+          <!-- Guard Demonstration Controls -->
+          <div class="guard-demo-section">
+            <div class="section-label-row">
+              <span class="control-label">Security gate demonstration</span>
+            </div>
+            <button type="button" class="btn btn-demo-guard" id="btn-demo-unapproved-finalize">
+              Demo: attempt unapproved finalize
+            </button>
+            <div class="guard-alert-box" id="guard-alert-box" style="display: none;" role="alert">
+              <span class="guard-alert-code" id="guard-alert-code">TOKEN_MISSING</span>
+              <span class="guard-alert-msg" id="guard-alert-msg">Blocked: Approval token required.</span>
+            </div>
+          </div>
+
+          <!-- Visible Audit Trail -->
+          <div class="audit-section">
+            <div class="audit-header">
+              <span class="table-title">Audit trail</span>
+              <button type="button" class="btn btn-subtle-sm" id="btn-export-audit">Export JSON</button>
+            </div>
+            <div class="audit-log-container" id="audit-log-container" role="log" aria-live="polite">
+              <!-- Timestamped log entries -->
+            </div>
+          </div>
         </div>
       </section>
     </main>
