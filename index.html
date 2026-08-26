@@ -216,22 +216,22 @@
           <div class="verdict-section">
             <div class="verdict-header">
               <span class="control-label" data-i18n="verdictHeading">Rule engine verdict</span>
-              <span class="domains-flagged-tag" id="domains-flagged-text">Flagged domains: none</span>
+              <span class="domains-flagged-tag" id="domains-flagged-text" data-i18n="awaitingAnalysis">Awaiting capture analysis</span>
             </div>
 
-            <div class="verdict-banner" id="verdict-banner">
-              <span class="verdict-label" id="verdict-text">ROUTINE_FOLLOWUP</span>
+            <div class="verdict-banner verdict-NOT_EVALUATED" id="verdict-banner">
+              <span class="verdict-label" id="verdict-text" data-i18n="verdictNotEvaluated">NOT_EVALUATED</span>
             </div>
 
             <div class="reason-codes-container">
               <span class="reason-codes-heading" data-i18n="reasonCodesHeading">Reason codes (hover to inspect rule &amp; highlight metric source):</span>
               <div class="chips-list" id="chips-list" role="list">
-                <!-- Chips injected dynamically -->
+                <span class="no-codes-text" data-i18n="awaitingAnalysis">Awaiting capture analysis</span>
               </div>
             </div>
 
             <div class="evidence-actions">
-              <button type="button" class="btn btn-primary btn-queue" id="btn-queue-referral" data-i18n="queueReferralBtn">
+              <button type="button" class="btn btn-primary btn-queue" id="btn-queue-referral" data-i18n="queueReferralBtn" disabled>
                 Submit referral for approval
               </button>
             </div>
@@ -261,8 +261,8 @@
               Demo: attempt unapproved finalize
             </button>
             <div class="guard-alert-box" id="guard-alert-box" style="display: none;" role="alert">
-              <span class="guard-alert-code" id="guard-alert-code">TOKEN_MISSING</span>
-              <span class="guard-alert-msg" id="guard-alert-msg">Blocked: Approval token required.</span>
+              <span class="guard-alert-code" id="guard-alert-code"></span>
+              <span class="guard-alert-msg" id="guard-alert-msg"></span>
             </div>
           </div>
 

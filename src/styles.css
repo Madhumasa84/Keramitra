@@ -628,6 +628,21 @@ html, body {
   color: var(--verdict-repeat-text);
 }
 
+.verdict-banner.verdict-NOT_EVALUATED {
+  background: var(--bg-subtle);
+  border-color: var(--border-hairline);
+  color: var(--text-secondary);
+}
+
+.btn-queue:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--border-hairline);
+  background: var(--bg-input);
+  color: var(--text-dim);
+  box-shadow: none;
+}
+
 /* Reason Code Chips & Traceability */
 .reason-codes-container {
   display: flex;

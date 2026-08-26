@@ -1,7 +1,7 @@
 /**
  * i18n.js - Comprehensive Multi-Language Dictionary & Evidence Explanations
  * Supports English ('en') and Tamil ('ta').
- * Plain spoken register for Tamil, suitable for a school health worker.
+ * Plain spoken register for Tamil, using accurate outreach terminology (கார்னியா).
  */
 
 import { CASES } from './synth.js';
@@ -41,6 +41,7 @@ export const STRINGS = {
     toggleOverlayBtn: 'Toggle mire overlay',
     qualityAdequate: 'ADEQUATE',
     qualityRepeat: 'REPEAT_REQUIRED',
+    qualityEvaluating: 'Evaluating...',
 
     // Image Metrics Table
     imageMetricsTitle: 'Placido ring metrics (analyze.js)',
@@ -70,6 +71,8 @@ export const STRINGS = {
 
     // Verdict & Reason Codes
     verdictHeading: 'Rule engine verdict',
+    verdictNotEvaluated: 'NOT_EVALUATED',
+    awaitingAnalysis: 'Awaiting capture analysis',
     flaggedDomainsNone: 'Flagged domains: none',
     flaggedDomainsPrefix: 'Flagged domains: ',
     reasonCodesHeading: 'Reason codes (hover to inspect rule & highlight metric source):',
@@ -121,10 +124,10 @@ export const STRINGS = {
   },
 
   ta: {
-    // Tamil translation written in plain spoken register for a school health worker
+    // Tamil translation written in plain spoken outreach register (கார்னியா)
     // Header & Meta
     systemTitle: 'கெராமித்ரா (KERAMITRA)',
-    systemSubtitle: 'கண் கருவிழி பட பரிசோதனை & முடிவு வழிகாட்டி',
+    systemSubtitle: 'கண் கார்னியா பட பரிசோதனை & முடிவு வழிகாட்டி',
     protocolLabel: 'முறை',
     protocolVal: '360-ஆர-பிளாசிடோ',
     modeLabel: 'பயன்முறை',
@@ -151,6 +154,7 @@ export const STRINGS = {
     toggleOverlayBtn: 'வளையங்களை காட்டு/மறை',
     qualityAdequate: 'சரியானது',
     qualityRepeat: 'மீண்டும் படம் தேவை',
+    qualityEvaluating: 'மதிப்பிடப்படுகிறது...',
 
     // Image Metrics Table
     imageMetricsTitle: 'பிளாசிடோ வளைய அளவீடுகள் (analyze.js)',
@@ -168,18 +172,20 @@ export const STRINGS = {
     metricCentroid: 'மையப் புள்ளி அமைவிடம்',
 
     // Biometrics Table
-    biometricsTitle: 'கருவிழி நேரடி அளவீடுகள்',
+    biometricsTitle: 'கார்னியா நேரடி அளவீடுகள்',
     biometricsSubtitle: 'கைமுறை உள்ளீடு / கருவி தரவு',
     colParameter: 'அளவீட்டு விவரம்',
     colThreshold: 'எச்சரிக்கை வரம்பு',
     paramK1: 'K1 (தட்டையான வளைவு)',
     paramK2: 'K2 (செங்குத்தான வளைவு)',
     paramAxis: 'கோண அளவு (Axis)',
-    paramPachy: 'மைய கருவிழி தடிமன்',
+    paramPachy: 'மைய கார்னியா தடிமன்',
     paramCyl: 'சிலிண்டர் பவர் (Cylinder)',
 
     // Verdict & Reason Codes
     verdictHeading: 'பரிசோதனை முடிவு (விதிமுறை என்ஜின்)',
+    verdictNotEvaluated: 'பரிசோதிக்கப்படவில்லை (NOT_EVALUATED)',
+    awaitingAnalysis: 'பரிசோதனை செய்யப்படவில்லை',
     flaggedDomainsNone: 'குறைபாடுள்ள பகுதிகள்: எதுவுமில்லை',
     flaggedDomainsPrefix: 'குறைபாடுள்ள பகுதிகள்: ',
     reasonCodesHeading: 'காரணக் குறியீடுகள் (விவரங்களை அறிய தொடவும்/பார்க்கவும்):',
@@ -191,15 +197,15 @@ export const STRINGS = {
     rule_IMG_SUSPICIOUS: 'spacingCV > 0.08 அல்லது isAsymmetry < -0.10',
     rule_IMG_REPEAT_REQUIRED: 'தரக்குறைவு: தெளிவான கோணங்கள் < 300',
     rule_K_HIGH: 'செங்குத்து வளைவு (K2) > 47.0 D',
-    rule_PACHY_LOW: 'மைய கருவிழி தடிமன் < 470 µm',
+    rule_PACHY_LOW: 'மைய கார்னியா தடிமன் < 470 µm',
     rule_CYL_HIGH: 'சிலிண்டர் பவர் அளவு > 1.50 D',
     rule_TWO_DOMAIN_ABNORMAL: '2 அல்லது அதற்கு மேற்பட்ட பகுதிகளில் குறைபாடு',
 
     // Reason Code Plain Spoken Descriptions (School Health Worker Register)
-    desc_IMG_SUSPICIOUS: 'கருவிழி வளையங்கள் கீழ் பகுதியில் நெருக்கமாகவும் ஒழுங்கற்றதாகவும் உள்ளன.',
+    desc_IMG_SUSPICIOUS: 'கார்னியா வளையங்கள் கீழ் பகுதியில் நெருக்கமாகவும் ஒழுங்கற்றதாகவும் உள்ளன.',
     desc_IMG_REPEAT_REQUIRED: 'இமை மூடியுள்ளது அல்லது அதிக ஒளி பட்டுள்ளது. மீண்டும் தெளிவாக படம் எடுக்க வேண்டும்.',
-    desc_K_HIGH: 'கருவிழியின் வளைவு வழக்கத்தை விட அதிகமாக உள்ளது (47.0 D-க்கு மேல்).',
-    desc_PACHY_LOW: 'மையக் கருவிழி மிக மெலிதாக உள்ளது (470 µm-க்கு கீழ்).',
+    desc_K_HIGH: 'கார்னியாவின் வளைவு வழக்கத்தை விட அதிகமாக உள்ளது (47.0 D-க்கு மேல்).',
+    desc_PACHY_LOW: 'மையக் கார்னியா மிக மெலிதாக உள்ளது (470 µm-க்கு கீழ்).',
     desc_CYL_HIGH: 'கண்ணின் உருளைத்திறன் (Cylinder) அதிகமாக உள்ளது (1.50 D-க்கு மேல்).',
     desc_TWO_DOMAIN_ABNORMAL: 'படம், வளைவு, தடிமன் ஆகியவற்றில் இரண்டில் குறைபாடு உள்ளது.',
 
@@ -265,7 +271,7 @@ export function generateEvidenceExplanation({
   const { K2, pachymetry, cylinder } = measurements || {};
 
   if (isTamil) {
-    // ── TAMIL (தமிழ்) — எளிய பேச்சுத் தமிழ் (School Health Worker Register) ───────
+    // ── TAMIL (தமிழ்) — எளிய பேச்சுத் தமிழ் (Outreach Worker Register: கார்னியா) ───
     if (quality === 'repeat_required' || reasonCodes.includes(REASON_CODES.IMG_REPEAT_REQUIRED)) {
       return (
         `படப்பதிவு தரம் போதாது: கண் இமை மூடல் அல்லது அதிகப்படியான ஒளி வெளிச்சம் காரணமாக ` +
@@ -277,24 +283,24 @@ export function generateEvidenceExplanation({
 
     if (verdict === VERDICTS.REFER) {
       const domainNames = {
-        image: 'கருவிழி வளைய படம்',
+        image: 'கார்னியா வளைய படம்',
         keratometry: 'வளைவு அளவு',
-        pachymetry: 'கருவிழி தடிமன்',
+        pachymetry: 'கார்னியா தடிமன்',
       };
       const flaggedDesc = domainsFlagged.map((d) => domainNames[d] || d).join(', ');
       return (
-        `கண் மருத்துவரிடம் பரிந்துரைக்க வேண்டும் (REFER): கண் கருவிழியின் கீழ் பகுதியில் வளையங்கள் ` +
+        `கண் மருத்துவரிடம் பரிந்துரைக்க வேண்டும் (REFER): கண் கார்னியாவின் கீழ் பகுதியில் வளையங்கள் ` +
         `நெருக்கமாகவும் வளைந்தும் காணப்படுகின்றன (I-S குறியீடு: ${isAsymmetry?.toFixed(3)}, இடைவெளி மாறுபாடு: ${spacingCV?.toFixed(3)}). ` +
-        `இதனுடன் கருவிழி வளைவு அதிகமாகவும் (K2: ${K2?.toFixed(1)} D > 47.0 D) மையக் கருவிழி மிக மெலிதாகவும் ` +
+        `இதனுடன் கார்னியா வளைவு அதிகமாகவும் (K2: ${K2?.toFixed(1)} D > 47.0 D) மையக் கார்னியா மிக மெலிதாகவும் ` +
         `(${pachymetry} µm < 470 µm) உள்ளது. இந்த முக்கிய குறைபாடுகள் (${flaggedDesc}) ` +
-        `கருவிழி கூம்பு நோய் (கெரடோகோனஸ்) சாத்தியத்தைக் காட்டுவதால், உடனடியாக சிறப்பு கண் மருத்துவரிடம் பரிசோதனைக்கு அனுப்ப வேண்டும்.`
+        `கார்னியா கூம்பு நோய் (கெரடோகோனஸ்) சாத்தியத்தைக் காட்டுவதால், உடனடியாக சிறப்பு கண் மருத்துவரிடம் பரிசோதனைக்கு அனுப்ப வேண்டும்.`
       );
     }
 
     return (
-      `வழக்கமான கண் பரிசோதனை போதுமானது (ROUTINE_FOLLOWUP): கருவிழி வளையங்கள் 360 பாகைகளிலும் ` +
+      `வழக்கமான கண் பரிசோதனை போதுமானது (ROUTINE_FOLLOWUP): கார்னியா வளையங்கள் 360 பாகைகளிலும் ` +
       `சீரான இடைவெளியுடன் வட்டமாக உள்ளன (இடைவெளி மாறுபாடு: ${spacingCV?.toFixed(3)}, சமச்சீரின்மை: ${isAsymmetry?.toFixed(3)}). ` +
-      `கருவிழி வளைவு (K2: ${K2?.toFixed(1)} D) மற்றும் மையத் தடிமன் (${pachymetry} µm) நல்ல இயல்பான அளவில் உள்ளன. ` +
+      `கார்னியா வளைவு (K2: ${K2?.toFixed(1)} D) மற்றும் மையத் தடிமன் (${pachymetry} µm) நல்ல இயல்பான அளவில் உள்ளன. ` +
       `சிறப்பு பரிந்துரை தேவையில்லை.`
     );
   }

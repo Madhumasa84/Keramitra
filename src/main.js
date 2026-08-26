@@ -398,7 +398,8 @@ function updateUI() {
     });
   }
 
-  // Update submit referral button text according to active verdict
+  // Update submit referral button state & text according to active verdict
+  elements.btnQueueReferral.disabled = !referralResult || !referralResult.verdict;
   elements.btnQueueReferral.textContent = referralResult.verdict === VERDICTS.REPEAT_SCAN
     ? t('queueRepeatBtn', currentLang)
     : t('queueReferralBtn', currentLang);
