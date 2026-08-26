@@ -12,39 +12,52 @@
 > 
 > - **No patient data of any kind** was collected, used, uploaded, or de-identified for this project.
 > - **All thresholds and decision rules** in `src/rules.js` are illustrative engineering demonstration thresholds and are **not clinically validated**.
-> - This application is designed solely to demonstrate deterministic evidence traceability, WebMCP model context governance, and cryptographic human-in-the-loop security gates.
+> - This application is designed solely to demonstrate deterministic evidence traceability, WebMCP model context governance, and single-use in-memory human-in-the-loop approval gates.
 
 ---
 
-## Setup and Reproducibility
+## Quick Verification (2 Seconds in DevTools)
 
-Keramitra runs as a static web application without server-side dependencies or database backends.
+To verify whether your browser is executing **Native WebMCP** or the **Compatibility Shim**, paste this one-liner into the Chrome DevTools Console (`F12`):
 
-### 1. Prerequisites and Browser Flag
-- **Recommended Browser**: **Google Chrome 146+** (Chromium 146–150+).
-- **Chrome Flag**:
-  1. Open `chrome://flags` in your Chrome address bar.
-  2. Search for: `#enable-model-context` (or `Model Context API`).
-  3. Set the flag to **Enabled**.
-  4. Relaunch Chrome.
-- **What to do if the flag is absent or disabled**:
-  Keramitra includes an automatic built-in WebMCP shim (`src/tools.js`). If `document.modelContext` / `navigator.modelContext` is not detected in your browser environment, the console automatically initializes the shim (`SHIM [8 TOOLS]`) so that all tools, evidence evaluation, and approval gates operate seamlessly via standard WebMCP protocol objects and manual controls.
+```javascript
+console.log(typeof document.modelContext?.registerTool === 'function' ? 'Native WebMCP active' : 'Running on compatibility shim');
+```
 
-### 2. Local Reproduction
+---
+
+## Setup and Native WebMCP Execution
+
+Keramitra is built primarily for **Native WebMCP** in Chrome 146+.
+
+### 1. Enabling Native WebMCP in Chrome
+1. Use **Google Chrome 146+** (Chrome Canary or Dev channel).
+2. Open `chrome://flags` in your address bar.
+3. In the search box, search for: **`WebMCP for testing`** (or **`Model Context`** / `#model-context-api`).
+4. Set the flag to **Enabled** and click **Relaunch**.
+5. When running with native support, the console header displays `NATIVE WebMCP [8 TOOLS ACTIVE]`.
+
+### 2. Compatibility Shim Notice (Graceful Degradation)
+If you evaluate Keramitra on a browser where experimental flags are unavailable:
+- The UI **loudly announces itself** with a prominent top banner: *"Running on compatibility shim — native WebMCP (document.modelContext) not detected."*
+- The header badge switches to `COMPATIBILITY SHIM [8 TOOLS]`.
+- All eight tools and approval guards execute via the local shim so judges can still evaluate the complete screening pipeline and approval gate without special browser flags.
+
+### 3. Local Reproduction
 ```bash
-# 1. Clone repository
+# Clone repository
 git clone https://github.com/Madhumasa84/Keramitra.git
 cd Keramitra
 
-# 2. Install dependencies
+# Install dependencies
 npm install
 
-# 3. Run test suites
+# Run automated test suites
 npm test               # Core image analysis & rule engine tests
 npm run test:rules     # Load-bearing proof (real image vs. stub image)
 npm run test:tools     # WebMCP tools & approval gate security checks
 
-# 4. Start local development server
+# Start local server
 npm run dev
 ```
 Open **[http://localhost:5173](http://localhost:5173)** in your browser.
@@ -53,14 +66,15 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ## Fallback Video Demonstration
 
-For evaluators or judges unable to enable browser flags or run locally:
-- **Demo Video Walkthrough**: [Keramitra End-to-End Walkthrough on YouTube / Demo Storage](https://github.com/Madhumasa84/Keramitra#demo-video) (or view the self-contained [animated walkthrough](./demo.gif)).
+For evaluators who cannot configure browser flags or run locally:
+- **90-Second Walkthrough Video**: [Watch Keramitra Demonstration on YouTube](https://youtu.be/8hR_3q8LgZo)
+- **Self-Contained Walkthrough**: You can also view the animated walkthrough directly in this repository: [`demo.gif`](./demo.gif).
 
 ---
 
 ## The Eight WebMCP Tools
 
-All tools are registered with complete JSON schemas and expose the exact same functional pathways driven by the UI buttons:
+All eight tools are exposed to WebMCP with full JSON schemas and call the exact same underlying logic functions driven by the UI buttons:
 
 | Tool Name | Input Schema (`args`) | Dependency Order & Preconditions | Output Description |
 |---|---|---|---|
@@ -77,7 +91,7 @@ All tools are registered with complete JSON schemas and expose the exact same fu
 
 ## The Approval Gate (Human-in-the-Loop Security Enforcement)
 
-Human approval in Keramitra is **structurally enforced, not advisory**. An automated agent or script **cannot** finalize or export a clinical screening report without a single-use token minted exclusively by a human clinician clicking **"Approve referral"** in the browser UI.
+Human approval in Keramitra is **structurally enforced, not advisory**. An automated agent or script **cannot** finalize or export a clinical screening report without a single-use, case-bound approval token held in memory only, minted exclusively when a human clinician clicks **"Approve referral"** in the browser UI.
 
 ```
 Agent Request                     Clinician in UI                 Finalize Gate
@@ -120,6 +134,12 @@ Calling `finalize_report` performs exhaustive pre-flight verification against th
 
 ---
 
+## Bilingual Clinical Reasoning (English & Tamil)
+
+Keramitra features complete bilingual clinical reasoning in English (`en`) and Tamil (`ta`). All Tamil strings and explanations in `src/i18n.js` are fully translated in a plain-spoken register tailored for community/school health workers (கிராமப்புற/பள்ளி சுகாதார பணியாளர் எளிதில் புரிந்துகொள்ளும் எளிய தமிழ்), paired with Noto Sans Tamil typography for clean glyph and conjunct rendering.
+
+---
+
 ## WebMCP Specification Note (Navigator to Document Migration)
 
 In the **May 2026 WebMCP draft specification**, the getter moved from `navigator.modelContext` to `document.modelContext`. `navigator.modelContext` remains a deprecated alias (deprecated in Chromium 150+).
@@ -130,7 +150,7 @@ Keramitra implements standard dual-resolution:
 // navigator.modelContext remains a deprecated alias; support both.
 const modelContext = document.modelContext ?? navigator.modelContext;
 ```
-If neither is native in the host browser, Keramitra's built-in fallback shim exposes the exact ModelContext tool registry interface to ensure unhindered local and cloud evaluation.
+If neither is native in the host browser, Keramitra's compatibility fallback shim activates and loudly identifies itself in the UI.
 
 ---
 
@@ -142,6 +162,7 @@ If neither is native in the host browser, Keramitra's built-in fallback shim exp
 
 ---
 
-## License
+## Repository Metadata
 
-MIT License. Copyright (c) 2026 Keramitra Contributors.
+- **Suggested Topics**: `webmcp`, `model-context-protocol`, `human-in-the-loop`, `medical-imaging`, `synthetic-data`
+- **License**: MIT License. Copyright (c) 2026 Keramitra Contributors.

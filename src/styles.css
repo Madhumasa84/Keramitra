@@ -192,10 +192,24 @@ html, body {
   background: var(--bg-input);
 }
 
+/* Shim Announcement Bar */
+.shim-announcement-bar {
+  background: rgba(207, 161, 78, 0.12);
+  border-bottom: 1px solid rgba(207, 161, 78, 0.35);
+  color: var(--verdict-repeat-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 16px;
+  text-align: center;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
 /* Main Application Layout (Three Columns) */
 .app-layout {
   display: grid;
   grid-template-columns: 340px minmax(420px, 1fr) 320px;
+  flex: 1;
   height: calc(100vh - var(--header-height) - var(--footer-height));
   overflow: hidden;
   background: var(--bg-app);

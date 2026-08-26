@@ -911,17 +911,27 @@ renderApprovalQueue();
 // Register WebMCP Tools
 const registrationResult = registerWebMCPTools(appController);
 
-// Update WebMCP status badge & setup instructions
+// Update WebMCP status badge & loud shim announcement bar
 const webmcpBadge = document.getElementById('webmcp-badge');
-if (webmcpBadge) {
-  if (registrationResult.modelContextAvailable) {
-    webmcpBadge.textContent = `ACTIVE [${registrationResult.toolsCount} TOOLS]`;
+const shimBar = document.getElementById('shim-announcement-bar');
+
+if (registrationResult.modelContextAvailable) {
+  if (webmcpBadge) {
+    webmcpBadge.textContent = `NATIVE WebMCP [${registrationResult.toolsCount} TOOLS]`;
     webmcpBadge.className = 'webmcp-badge active';
-    webmcpBadge.title = 'WebMCP Document Model Context API active and connected.';
-  } else {
-    webmcpBadge.textContent = `SHIM [${registrationResult.toolsCount} TOOLS]`;
+    webmcpBadge.title = 'Native WebMCP (document.modelContext) active and connected.';
+  }
+  if (shimBar) {
+    shimBar.style.display = 'none';
+  }
+} else {
+  if (webmcpBadge) {
+    webmcpBadge.textContent = `COMPATIBILITY SHIM [${registrationResult.toolsCount} TOOLS]`;
     webmcpBadge.className = 'webmcp-badge shimmed';
-    webmcpBadge.title = 'Native ModelContext not detected. Enable chrome://flags/#enable-model-context in Chrome 146+ or use WebMCP shim.';
+    webmcpBadge.title = 'Native document.modelContext not detected. Running on WebMCP compatibility shim.';
+  }
+  if (shimBar) {
+    shimBar.style.display = 'block';
   }
 }
 
