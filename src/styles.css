@@ -3,6 +3,8 @@
    Laboratory / Ophthalmic Device Readout Aesthetic
    ========================================================================== */
 
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap');
+
 :root {
   /* Colors */
   --bg-app: #0a0c10;
@@ -38,12 +40,24 @@
   --trace-highlight-border: #d4973b;
 
   /* Fonts */
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", "Noto Sans Tamil", monospace;
+  --font-sans: 'Noto Sans Tamil', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
   /* Sizing */
   --header-height: 44px;
   --footer-height: 32px;
+}
+
+html[lang="ta"] {
+  --font-sans: 'Noto Sans Tamil', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Noto Sans Tamil', ui-monospace, monospace;
+}
+
+html[lang="ta"] .num-col,
+html[lang="ta"] .num-input,
+html[lang="ta"] .reason-chip span:first-child,
+html[lang="ta"] .token-val {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace, 'Noto Sans Tamil';
 }
 
 /* Reset & Box Sizing */
@@ -59,9 +73,44 @@ html, body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Language selector */
+.lang-selector-group {
+  display: flex;
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-input);
+  margin-left: 8px;
+}
+
+.btn-lang {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-right: 1px solid var(--border-hairline);
+}
+
+.btn-lang:last-child {
+  border-right: none;
+}
+
+.btn-lang:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-lang.active {
+  background: var(--bg-subtle);
+  color: var(--accent-action);
+  box-shadow: inset 0 -2px 0 var(--accent-action);
 }
 
 /* Accessible focus ring */

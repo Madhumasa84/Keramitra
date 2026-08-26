@@ -1,13 +1,14 @@
 /**
  * main.js - Keramitra Interactive Screening Console, WebMCP Host & Approval Gate
- * Fully manual UI driving image generation, analysis, rule engine, WebMCP tools, and
- * structurally enforced cryptographic human approval gate with live audit trail.
+ * Fully manual UI driving image generation, analysis, rule engine, WebMCP tools,
+ * structurally enforced approval gate, audit trail, and full Tamil (ta) / English (en) i18n.
  */
 
 import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS } from './synth.js';
 import { analyzeRings } from './analyze.js';
 import { evaluateReferral, THRESHOLDS, REASON_CODES, VERDICTS } from './rules.js';
 import { registerWebMCPTools, unregisterWebMCPTools } from './tools.js';
+import { STRINGS, t, generateEvidenceExplanation } from './i18n.js';
 
 // Structured Guard Error Codes (Exhaustive)
 export const GUARD_ERRORS = {
@@ -24,6 +25,7 @@ const tokenRegistry = new Map();
 
 // Application State
 const state = {
+  currentLang: 'en',
   currentCase: CASES.CASE_A,
   currentEye: 'OD',
   showMireOverlay: false,
@@ -44,11 +46,13 @@ const elements = {
   btnCaseC: document.getElementById('btn-case-c'),
   btnEyeOD: document.getElementById('btn-eye-od'),
   btnEyeOS: document.getElementById('btn-eye-os'),
+  btnLangEn: document.getElementById('btn-lang-en'),
+  btnLangTa: document.getElementById('btn-lang-ta'),
   btnAnalyze: document.getElementById('btn-analyze'),
   btnToggleOverlay: document.getElementById('btn-toggle-overlay'),
   qualityChip: document.getElementById('quality-chip'),
   usableMeridiansVal: document.getElementById('usable-meridians-val'),
-  
+
   // Table metrics
   valRingCount: document.getElementById('val-ringCount'),
   valSpacingCV: document.getElementById('val-spacingCV'),
@@ -85,6 +89,33 @@ const elements = {
   auditLogContainer: document.getElementById('audit-log-container'),
   btnExportAudit: document.getElementById('btn-export-audit'),
 };
+
+/**
+ * Apply localized strings to all DOM nodes with `data-i18n` attribute.
+ */
+function applyLanguage(lang) {
+  state.currentLang = lang;
+  document.documentElement.lang = lang;
+
+  // Toggle active button state
+  if (elements.btnLangEn && elements.btnLangTa) {
+    elements.btnLangEn.classList.toggle('active', lang === 'en');
+    elements.btnLangTa.classList.toggle('active', lang === 'ta');
+  }
+
+  // Update all elements with data-i18n
+  const translatables = document.querySelectorAll('[data-i18n]');
+  translatables.forEach((el) => {
+    const key = el.getAttribute('data-i18n');
+    if (key) {
+      el.textContent = t(key, lang);
+    }
+  });
+
+  // Re-render dynamic components with translated strings
+  updateUI();
+  renderApprovalQueue();
+}
 
 /**
  * Append an entry to the visible audit trail and internal log.
@@ -211,32 +242,38 @@ function drawCanvas() {
 
 /**
  * Map reason codes to threshold descriptions and target table row IDs for traceability.
+ * Reason codes remain in English; their explanations/rules are localized.
  */
-function getReasonCodeMeta(code, domainsFlagged = []) {
+function getReasonCodeMeta(code, domainsFlagged = [], lang = 'en') {
   switch (code) {
     case REASON_CODES.IMG_SUSPICIOUS:
       return {
-        thresholdDesc: `spacingCV > ${THRESHOLDS.IMG_SPACING_CV} OR isAsymmetry < ${THRESHOLDS.IMG_IS_ASYMMETRY}`,
+        thresholdDesc: t('rule_IMG_SUSPICIOUS', lang),
+        plainDesc: t('desc_IMG_SUSPICIOUS', lang),
         targetRowIds: ['metric-row-spacingCV', 'metric-row-isAsymmetry'],
       };
     case REASON_CODES.IMG_REPEAT_REQUIRED:
       return {
-        thresholdDesc: `quality === "repeat_required" (usable meridians < ${THRESHOLDS.IMG_MERIDIANS_USABLE})`,
+        thresholdDesc: t('rule_IMG_REPEAT_REQUIRED', lang),
+        plainDesc: t('desc_IMG_REPEAT_REQUIRED', lang),
         targetRowIds: ['metric-row-meridiansUsable'],
       };
     case REASON_CODES.K_HIGH:
       return {
-        thresholdDesc: `Steep K (K2) > ${THRESHOLDS.K_STEEP_MAX.toFixed(1)} D`,
+        thresholdDesc: t('rule_K_HIGH', lang),
+        plainDesc: t('desc_K_HIGH', lang),
         targetRowIds: ['metric-row-K2'],
       };
     case REASON_CODES.PACHY_LOW:
       return {
-        thresholdDesc: `Central thickness < ${THRESHOLDS.PACHY_CENTRAL_MIN.toFixed(0)} µm`,
+        thresholdDesc: t('rule_PACHY_LOW', lang),
+        plainDesc: t('desc_PACHY_LOW', lang),
         targetRowIds: ['metric-row-pachymetry'],
       };
     case REASON_CODES.CYL_HIGH:
       return {
-        thresholdDesc: `Cylinder magnitude > ${THRESHOLDS.CYL_MAG_MAX.toFixed(2)} D`,
+        thresholdDesc: t('rule_CYL_HIGH', lang),
+        plainDesc: t('desc_CYL_HIGH', lang),
         targetRowIds: ['metric-row-cylinder'],
       };
     case REASON_CODES.TWO_DOMAIN_ABNORMAL: {
@@ -251,12 +288,13 @@ function getReasonCodeMeta(code, domainsFlagged = []) {
         rows.push('metric-row-pachymetry');
       }
       return {
-        thresholdDesc: `≥ ${THRESHOLDS.TWO_DOMAIN_MIN_COUNT} independent domains abnormal: {${domainsFlagged.join(', ')}}`,
+        thresholdDesc: `${t('rule_TWO_DOMAIN_ABNORMAL', lang)}: {${domainsFlagged.join(', ')}}`,
+        plainDesc: t('desc_TWO_DOMAIN_ABNORMAL', lang),
         targetRowIds: rows.length > 0 ? rows : ['metric-row-spacingCV', 'metric-row-K2', 'metric-row-pachymetry'],
       };
     }
     default:
-      return { thresholdDesc: 'Clinical rule threshold', targetRowIds: [] };
+      return { thresholdDesc: 'Clinical rule threshold', plainDesc: '', targetRowIds: [] };
   }
 }
 
@@ -293,13 +331,14 @@ function readMeasurementsFromInputs() {
  * Update UI with current analysis and referral evaluation results.
  */
 function updateUI() {
-  const { imageResult, referralResult } = state;
+  const { imageResult, referralResult, currentLang } = state;
   if (!imageResult || !referralResult) return;
 
   // 1. Capture quality chip & meridians
-  elements.qualityChip.textContent = imageResult.quality === 'adequate'
-    ? 'ADEQUATE'
-    : 'REPEAT_REQUIRED';
+  const qualityLabel = imageResult.quality === 'adequate'
+    ? t('qualityAdequate', currentLang)
+    : t('qualityRepeat', currentLang);
+  elements.qualityChip.textContent = qualityLabel;
   elements.qualityChip.className = `quality-chip ${imageResult.quality}`;
   elements.usableMeridiansVal.textContent = `${imageResult.meridiansUsable} / 360`;
 
@@ -318,8 +357,8 @@ function updateUI() {
 
   // 4. Domains flagged
   const flaggedText = referralResult.domainsFlagged.length > 0
-    ? `Flagged domains: ${referralResult.domainsFlagged.join(', ')}`
-    : 'Flagged domains: none';
+    ? `${t('flaggedDomainsPrefix', currentLang)}${referralResult.domainsFlagged.join(', ')}`
+    : t('flaggedDomainsNone', currentLang);
   elements.domainsFlaggedText.textContent = flaggedText;
 
   // 5. Render reason code chips with hover tooltips and traceability wiring
@@ -327,11 +366,11 @@ function updateUI() {
   if (referralResult.reasonCodes.length === 0) {
     const emptyNotice = document.createElement('span');
     emptyNotice.className = 'no-codes-text';
-    emptyNotice.textContent = 'None (all parameters within normal limits)';
+    emptyNotice.textContent = t('noReasonCodes', currentLang);
     elements.chipsList.appendChild(emptyNotice);
   } else {
     referralResult.reasonCodes.forEach((code) => {
-      const meta = getReasonCodeMeta(code, referralResult.domainsFlagged);
+      const meta = getReasonCodeMeta(code, referralResult.domainsFlagged, currentLang);
 
       const chip = document.createElement('button');
       chip.type = 'button';
@@ -339,13 +378,14 @@ function updateUI() {
       chip.setAttribute('tabindex', '0');
       chip.setAttribute('aria-label', `${code}: ${meta.thresholdDesc}`);
 
+      // Reason codes remain in English as identifiers
       const codeSpan = document.createElement('span');
       codeSpan.textContent = code;
       chip.appendChild(codeSpan);
 
       const tooltip = document.createElement('span');
       tooltip.className = 'chip-tooltip';
-      tooltip.textContent = `Rule: ${meta.thresholdDesc}`;
+      tooltip.textContent = meta.plainDesc ? `${meta.thresholdDesc} — ${meta.plainDesc}` : meta.thresholdDesc;
       chip.appendChild(tooltip);
 
       // Traceability interaction: mouse & keyboard focus
@@ -360,8 +400,8 @@ function updateUI() {
 
   // Update submit referral button text according to active verdict
   elements.btnQueueReferral.textContent = referralResult.verdict === VERDICTS.REPEAT_SCAN
-    ? 'Queue repeat scan request'
-    : 'Submit referral for approval';
+    ? t('queueRepeatBtn', currentLang)
+    : t('queueReferralBtn', currentLang);
 }
 
 /**
@@ -424,9 +464,10 @@ function loadCase(caseId) {
  * Render the approval queue cards with complete evidence summary & single-use token display.
  */
 function renderApprovalQueue() {
+  const { currentLang } = state;
   const count = state.approvalQueue.length;
   const pendingCount = state.approvalQueue.filter((i) => i.status === 'PENDING').length;
-  elements.queueCountBadge.textContent = `${pendingCount} pending`;
+  elements.queueCountBadge.textContent = `${pendingCount} ${t('pendingSuffix', currentLang)}`;
 
   if (count === 0) {
     elements.queueEmptyState.style.display = 'block';
@@ -462,14 +503,14 @@ function renderApprovalQueue() {
       const actionText = document.createElement('div');
       actionText.className = 'meta-label';
       actionText.style.color = 'var(--text-primary)';
-      actionText.textContent = `Action: ${item.proposedAction}`;
+      actionText.textContent = `${t('cardActionPrefix', currentLang)}${item.proposedAction}`;
       card.appendChild(actionText);
     }
 
     if (item.reasonCodes.length > 0) {
       const reasons = document.createElement('div');
       reasons.className = 'card-reasons';
-      reasons.textContent = `Reason codes: ${item.reasonCodes.join(', ')}`;
+      reasons.textContent = `${t('cardReasonPrefix', currentLang)}${item.reasonCodes.join(', ')}`;
       card.appendChild(reasons);
     }
 
@@ -480,12 +521,15 @@ function renderApprovalQueue() {
       const btnApprove = document.createElement('button');
       btnApprove.type = 'button';
       btnApprove.className = 'btn btn-approve';
-      btnApprove.textContent = item.verdict === VERDICTS.REPEAT_SCAN ? 'Approve repeat scan' : 'Approve referral';
+      btnApprove.textContent = item.verdict === VERDICTS.REPEAT_SCAN
+        ? t('btnApproveRepeat', currentLang)
+        : t('btnApproveReferral', currentLang);
+
       btnApprove.addEventListener('click', () => {
         // Mint single-use token bound to { requestId, caseId, timestamp }
         const mintedAt = Date.now();
         const token = `tok_${Math.random().toString(36).slice(2, 10)}_${mintedAt}`;
-        
+
         tokenRegistry.set(token, {
           token,
           requestId: item.id,
@@ -511,7 +555,10 @@ function renderApprovalQueue() {
       const btnReject = document.createElement('button');
       btnReject.type = 'button';
       btnReject.className = 'btn btn-reject';
-      btnReject.textContent = item.verdict === VERDICTS.REPEAT_SCAN ? 'Reject repeat scan' : 'Reject referral';
+      btnReject.textContent = item.verdict === VERDICTS.REPEAT_SCAN
+        ? t('btnRejectRepeat', currentLang)
+        : t('btnRejectReferral', currentLang);
+
       btnReject.addEventListener('click', () => {
         item.status = 'REJECTED';
         renderApprovalQueue();
@@ -531,21 +578,21 @@ function renderApprovalQueue() {
     } else if (item.status === 'APPROVED') {
       const statusBanner = document.createElement('div');
       statusBanner.className = 'card-status-banner';
-      statusBanner.textContent = 'Approved';
+      statusBanner.textContent = t('statusApproved', currentLang);
       card.appendChild(statusBanner);
 
       // Display single-use token
       const tokenContainer = document.createElement('div');
       tokenContainer.className = 'token-badge-container';
       tokenContainer.innerHTML = `
-        <span class="token-label">Single-use token (valid 5 min)</span>
+        <span class="token-label">${t('tokenLabel', currentLang)}</span>
         <span class="token-val">${item.approvalToken}</span>
       `;
       card.appendChild(tokenContainer);
     } else {
       const statusBanner = document.createElement('div');
       statusBanner.className = 'card-status-banner';
-      statusBanner.textContent = 'Rejected';
+      statusBanner.textContent = t('statusRejected', currentLang);
       card.appendChild(statusBanner);
     }
 
@@ -619,7 +666,6 @@ export function finalizeReport({ caseId, approvalToken }) {
   // Check 2: Token Not Found / Rejected
   const tokenObj = tokenRegistry.get(approvalToken);
   if (!tokenObj) {
-    // Check if request ID exists but was rejected
     const rejectedItem = state.approvalQueue.find((i) => i.id === approvalToken && i.status === 'REJECTED');
     const errorCode = rejectedItem ? GUARD_ERRORS.APPROVAL_REJECTED : GUARD_ERRORS.TOKEN_NOT_FOUND;
     const errorObj = {
@@ -740,8 +786,8 @@ function handleDemoUnapprovedFinalize() {
   const result = finalizeReport({ caseId: state.currentCase, approvalToken: null });
 
   if (elements.guardAlertBox && elements.guardAlertCode && elements.guardAlertMsg) {
-    elements.guardAlertCode.textContent = result.error;
-    elements.guardAlertMsg.textContent = result.message;
+    elements.guardAlertCode.textContent = t('tokenMissingTitle', state.currentLang);
+    elements.guardAlertMsg.textContent = t('tokenMissingMsg', state.currentLang);
     elements.guardAlertBox.style.display = 'flex';
 
     setTimeout(() => {
@@ -756,6 +802,14 @@ function handleDemoUnapprovedFinalize() {
  * Initialize event listeners.
  */
 function setupEventListeners() {
+  // Language toggles
+  if (elements.btnLangEn) {
+    elements.btnLangEn.addEventListener('click', () => applyLanguage('en'));
+  }
+  if (elements.btnLangTa) {
+    elements.btnLangTa.addEventListener('click', () => applyLanguage('ta'));
+  }
+
   // Case presets
   elements.btnCaseA.addEventListener('click', () => loadCase(CASES.CASE_A));
   elements.btnCaseB.addEventListener('click', () => loadCase(CASES.CASE_B));
@@ -837,6 +891,7 @@ export const appController = {
   getMeasurements: () => ({ ...state.measurements }),
   evaluateActiveReferral: () => evaluateCurrentState(),
   getState: () => ({ ...state }),
+  setLanguage: (lang) => applyLanguage(lang),
   queueReferralRequest: ({ caseId, proposedAction }) => {
     if (caseId && caseId !== state.currentCase) {
       loadCase(caseId);
@@ -849,6 +904,7 @@ export const appController = {
 
 // Initial bootstrap
 setupEventListeners();
+applyLanguage('en');
 loadCase(CASES.CASE_A);
 renderApprovalQueue();
 
