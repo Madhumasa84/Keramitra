@@ -189,7 +189,12 @@ export function registerWebMCPTools(controller) {
 
   // Tool implementation mapping calling existing UI controller methods
   const toolHandlers = {
-    list_cases: async () => {
+    list_cases: async (params) => {
+      if (params && typeof params === 'object' && Object.keys(params).length > 0) {
+        throw new Error(
+          `Invalid input for 'list_cases': tool accepts no arguments (received unexpected keys: ${Object.keys(params).join(', ')}).`
+        );
+      }
       return {
         cases: [
           {
