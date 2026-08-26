@@ -10,6 +10,42 @@ export const CASES = {
 };
 
 /**
+ * Plausible synthetic keratometry + pachymetry measurements per case.
+ *
+ * Chosen so that, combined with the real image analysis numbers from analyzeRings():
+ *   CASE_A → ROUTINE_FOLLOWUP  (all domains normal)
+ *   CASE_B → REFER / TWO_DOMAIN_ABNORMAL (image suspicious + K_HIGH + PACHY_LOW)
+ *   CASE_C → REPEAT_SCAN       (image quality repeat_required suppresses verdict)
+ *
+ * Units: K1/K2 in dioptres, axis in degrees, pachymetry in µm, cylinder in dioptres.
+ *
+ * These values are illustrative only. See README for clinical disclaimer.
+ */
+export const SYNTHETIC_MEASUREMENTS = {
+  [CASES.CASE_A]: {
+    K1:         43.2,   // flat meridian, normal range 40–46 D
+    K2:         43.8,   // steep meridian, normal
+    axis:        92,    // near-horizontal astigmatism
+    pachymetry: 548,    // central thickness, normal (520–600 µm)
+    cylinder:    0.6,   // low cylinder, sub-threshold
+  },
+  [CASES.CASE_B]: {
+    K1:         44.5,   // flat meridian
+    K2:         48.6,   // steep meridian > 47.0 D threshold → K_HIGH
+    axis:        98,
+    pachymetry: 452,    // thin cornea < 470 µm → PACHY_LOW
+    cylinder:    2.1,   // elevated → CYL_HIGH (supporting signal)
+  },
+  [CASES.CASE_C]: {
+    K1:         43.5,   // otherwise-normal keratometry
+    K2:         44.1,
+    axis:        88,
+    pachymetry: 531,    // normal pachymetry
+    cylinder:    0.75,  // sub-threshold cylinder
+  },
+};
+
+/**
  * Generate synthetic Placido disc image data.
  * @param {string} caseId - 'CASE_A', 'CASE_B', or 'CASE_C'
  * @param {number} width - image width (default 512)
