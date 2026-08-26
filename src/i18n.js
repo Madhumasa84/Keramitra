@@ -32,11 +32,14 @@ export const STRINGS = {
     caseA: 'Case A',
     caseB: 'Case B',
     caseC: 'Case C',
+    caseD: 'Case D (Security demo)',
     eyeLabel: 'Eye',
     eyeOD: 'OD (Right)',
     eyeOS: 'OS (Left)',
     captureQualityLabel: 'Capture quality',
     usableMeridiansLabel: 'Usable meridians',
+    operatorRemarksLabel: 'Operator remarks',
+    adversarialBadge: 'ADVERSARIAL METADATA',
     analyzeCaptureBtn: 'Analyze capture',
     toggleOverlayBtn: 'Toggle mire overlay',
     qualityAdequate: 'ADEQUATE',
@@ -111,9 +114,11 @@ export const STRINGS = {
 
     // Security Gate & Demo
     guardSectionTitle: 'Security gate demonstration',
-    btnDemoUnapprovedFinalize: 'Demo: attempt unapproved finalize',
+    btnDemoUnapprovedFinalize: 'Demo: unapproved finalize attempt',
+    btnDemoCaseDInjection: 'Demo: prompt-injection bypass attempt',
     tokenMissingTitle: 'TOKEN_MISSING',
     tokenMissingMsg: 'Blocked: Approval token required to finalize report. Request human approval first.',
+    tokenMissingAdversarialMsg: 'Blocked: Prompt injection override rejected. Offline clinician notes in metadata cannot bypass the structural in-memory approval gate.',
 
     // Audit Trail
     auditTitle: 'Audit trail',
@@ -145,11 +150,14 @@ export const STRINGS = {
     caseA: 'மாதிரி A (இயல்பு)',
     caseB: 'மாதிரி B (வளைவு நோய்)',
     caseC: 'மாதிரி C (மறுபடம் தேவை)',
+    caseD: 'மாதிரி D (பாதுகாப்பு சோதனை)',
     eyeLabel: 'கண்',
     eyeOD: 'வலது கண் (OD)',
     eyeOS: 'இடது கண் (OS)',
     captureQualityLabel: 'படத்தின் தரம்',
     usableMeridiansLabel: 'தெளிவான கோணங்கள்',
+    operatorRemarksLabel: 'ஆபரேட்டர் குறிப்புகள்',
+    adversarialBadge: 'பாதுகாப்பு சோதனை குறிப்பு',
     analyzeCaptureBtn: 'படத்தை பரிசோதி',
     toggleOverlayBtn: 'வளையங்களை காட்டு/மறை',
     qualityAdequate: 'சரியானது',
@@ -167,7 +175,7 @@ export const STRINGS = {
     metricSpacingCV: 'வளைய இடைவெளி மாறுபாடு (CV)',
     metricIsAsymmetry: 'கீழ்-மேல் சமச்சீரற்ற குறியீடு (I-S)',
     metricMeridiansUsable: 'தெளிவான கோணங்களின் எண்ணிக்கை',
-    metricMeanInferior: 'கீழ் பகுதி சராசரி இடைவெளி (210°–330°)',
+    metricMeanInferior: 'கீழ் பகுதி சராசரி இடைவெளி (210°–330°) ',
     metricMeanSuperior: 'மேல் பகுதி சராசரி இடைவெளி (30°–150°)',
     metricCentroid: 'மையப் புள்ளி அமைவிடம்',
 
@@ -225,8 +233,10 @@ export const STRINGS = {
     // Security Gate & Demo
     guardSectionTitle: 'பாதுகாப்பு சோதனை',
     btnDemoUnapprovedFinalize: 'ஒப்புதலின்றி முடிக்க முயற்சி செய் (Demo)',
+    btnDemoCaseDInjection: 'மாதிரி D ஊடுருவல் சோதனை (Injection Demo)',
     tokenMissingTitle: 'TOKEN_MISSING (டோக்கன் இல்லை)',
     tokenMissingMsg: 'தடைசெய்யப்பட்டது: மருத்துவர் ஒப்புதல் டோக்கன் இல்லாமல் அறிக்கையை முடிக்க முடியாது.',
+    tokenMissingAdversarialMsg: 'தடைசெய்யப்பட்டது: ஆபரேட்டர் குறிப்பு மூலம் மனித ஒப்புதலை தவிர்க்க முடியாது. மருத்துவரின் நேரடி ஒப்புதல் அவசியம்.',
 
     // Audit Trail
     auditTitle: 'செயல்பாட்டு பதிவு (Audit Trail)',

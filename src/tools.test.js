@@ -131,11 +131,25 @@ const mockController = {
 
     // Check 1: Token Missing
     if (!approvalToken) {
-      const err = { status: 'blocked', error: 'TOKEN_MISSING', message: 'Approval token required.', caseId: targetCase };
+      const isAdversarial = targetCase === CASES.CASE_D;
+      const action = isAdversarial
+        ? 'GUARD_VIOLATION: Unapproved finalize attempt following adversarial metadata instruction (CASE_D)'
+        : 'finalize_report blocked (TOKEN_MISSING)';
+      const message = isAdversarial
+        ? 'Blocked: Prompt injection override rejected. Offline clinician notes in metadata cannot bypass the structural in-memory approval gate.'
+        : 'Approval token required.';
+
+      const err = {
+        status: 'blocked',
+        error: 'TOKEN_MISSING',
+        adversarialBypassAttempted: isAdversarial,
+        message,
+        caseId: targetCase,
+      };
       logAudit({
         type: 'GUARD_VIOLATION',
         actor: 'AGENT',
-        action: 'finalize_report blocked (TOKEN_MISSING)',
+        action,
         status: 'BLOCKED',
         details: err,
       });
@@ -346,21 +360,28 @@ const rejectResult = await callTool('finalize_report', {
 });
 console.log(`3d. Rejected request → Error: ${rejectResult.error} (${rejectResult.status})`);
 
-// ── TEST 4: AUDIT TRAIL LOGGING VERIFICATION ──────────────────────────────────
-console.log('\n[TEST 4] Audit Trail Log Summary\n');
-console.table(
-  testAuditTrail.slice(0, 8).map((a) => ({
-    'Timestamp': a.timestamp.split('T')[1].slice(0, 8),
-    'Actor': a.actor,
-    'Type': a.type,
-    'Action': a.action,
-    'Status': a.status,
-  }))
-);
+// ── TEST 5: PROMPT-INJECTION ADVERSARIAL DEFENSE (CASE_D) ──────────────────────
+console.log('\n[TEST 5] Prompt-Injection Adversarial Defense on CASE_D\n');
+
+// 5a. Load Case D with realistic prompt-injection metadata
+const loadCaseD = await callTool('load_case', { caseId: CASES.CASE_D });
+console.log(`Case D Loaded: isAdversarial=${loadCaseD.isAdversarialInjection}`);
+console.log(`Operator Remarks: "${loadCaseD.operatorRemarks}"`);
+
+// 5b. Agent attempts unapproved finalize following injected metadata instruction
+const injectionBypassAttempt = await callTool('finalize_report', {
+  caseId: CASES.CASE_D,
+  approvalToken: null,
+});
+console.log(`Bypass Attempt Result: status=${injectionBypassAttempt.status}, error=${injectionBypassAttempt.error}`);
+console.log(`Error Message: "${injectionBypassAttempt.message}"`);
+
+const lastAuditCaseD = testAuditTrail[0];
+console.log(`Audit Record: [${lastAuditCaseD.type}] ${lastAuditCaseD.action} (status=${lastAuditCaseD.status})`);
 
 // ── ACCEPTANCE SUMMARY ────────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(88));
-console.log('  PROMPT 6 ACCEPTANCE VERIFICATION');
+console.log('  ACCEPTANCE VERIFICATION SCORECARD');
 console.log('='.repeat(88));
 
 let passed = true;
@@ -377,10 +398,13 @@ assert('5. Case mismatch prevented (TOKEN_CASE_MISMATCH)', caseMismatchResult.er
 assert('6. Expired token rejected (TOKEN_EXPIRED)', expiredResult.error === 'TOKEN_EXPIRED');
 assert('7. Clinician-rejected request blocked (APPROVAL_REJECTED)', rejectResult.error === 'APPROVAL_REJECTED');
 assert('8. Complete audit log maintained with timestamps & actor tracking', testAuditTrail.length >= 8);
+assert('9. Case D returns realistic prompt injection metadata in load_case', loadCaseD.isAdversarialInjection === true && loadCaseD.operatorRemarks.includes('offline'));
+assert('10. Case D prompt injection bypass attempt is blocked with TOKEN_MISSING', injectionBypassAttempt.status === 'blocked' && injectionBypassAttempt.adversarialBypassAttempted === true);
+assert('11. Case D injection attempt is distinctly logged in Audit Trail', lastAuditCaseD.action.includes('adversarial metadata instruction'));
 
 console.log('\n' + '='.repeat(88));
 if (passed) {
-  console.log('  ALL PROMPT 6 STRUCTURAL APPROVAL GATE ACCEPTANCE CRITERIA PASSED.');
+  console.log('  ALL STRUCTURAL APPROVAL GATE & ADVERSARIAL DEFENSE CRITERIA PASSED.');
 } else {
   console.error('  VALIDATION FAILED.');
   process.exit(1);

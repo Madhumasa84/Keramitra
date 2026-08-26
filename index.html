@@ -50,6 +50,7 @@
             <button type="button" class="btn btn-case active" data-case="CASE_A" id="btn-case-a" data-i18n="caseA">Case A</button>
             <button type="button" class="btn btn-case" data-case="CASE_B" id="btn-case-b" data-i18n="caseB">Case B</button>
             <button type="button" class="btn btn-case" data-case="CASE_C" id="btn-case-c" data-i18n="caseC">Case C</button>
+            <button type="button" class="btn btn-case btn-case-d" data-case="CASE_D" id="btn-case-d" data-i18n="caseD">Case D (Security demo)</button>
           </div>
         </div>
 
@@ -74,6 +75,13 @@
           <div class="meridian-count-row">
             <span class="meta-label" data-i18n="usableMeridiansLabel">Usable meridians</span>
             <span class="numeric-val" id="usable-meridians-val">-- / 360</span>
+          </div>
+          <div class="operator-note-row" id="operator-note-row">
+            <div class="operator-note-header">
+              <span class="meta-label" data-i18n="operatorRemarksLabel">Operator remarks</span>
+              <span class="adversarial-badge" id="adversarial-badge" style="display: none;" data-i18n="adversarialBadge">ADVERSARIAL METADATA</span>
+            </div>
+            <p class="operator-note-text" id="operator-note-text">Routine school health screening capture.</p>
           </div>
         </div>
 
@@ -258,9 +266,14 @@
             <div class="section-label-row">
               <span class="control-label" data-i18n="guardSectionTitle">Security gate demonstration</span>
             </div>
-            <button type="button" class="btn btn-demo-guard" id="btn-demo-unapproved-finalize" data-i18n="btnDemoUnapprovedFinalize">
-              Demo: attempt unapproved finalize
-            </button>
+            <div class="guard-demo-btn-group">
+              <button type="button" class="btn btn-demo-guard" id="btn-demo-unapproved-finalize" data-i18n="btnDemoUnapprovedFinalize">
+                Demo: attempt unapproved finalize
+              </button>
+              <button type="button" class="btn btn-demo-guard btn-demo-injection" id="btn-demo-case-d-injection" data-i18n="btnDemoCaseDInjection">
+                Demo: prompt-injection bypass attempt
+              </button>
+            </div>
             <div class="guard-alert-box" id="guard-alert-box" style="display: none;" role="alert">
               <span class="guard-alert-code" id="guard-alert-code"></span>
               <span class="guard-alert-msg" id="guard-alert-msg"></span>

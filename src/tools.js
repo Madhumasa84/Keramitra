@@ -1,12 +1,10 @@
 /**
- * tools.js - WebMCP Tool Registration & Dispatcher
- * Exposes Keramitra screening capabilities as standard WebMCP tools.
- *
- * Spec moved the getter Navigator → Document (May 2026 draft).
- * navigator.modelContext remains a deprecated alias; support both.
+ * tools.js - WebMCP Tool Registration & In-Browser Dispatch
+ * Registers Keramitra screening functions directly onto document.modelContext
+ * with full JSON Schemas and consistent error reporting.
  */
 
-import { CASES } from './synth.js';
+import { CASES, CASE_METADATA } from './synth.js';
 import { generateEvidenceExplanation } from './i18n.js';
 
 let registeredToolNames = [];
@@ -19,7 +17,8 @@ export const TOOL_DEFINITIONS = [
     name: 'list_cases',
     description:
       'Discovers available synthetic corneal topography cases. Returns case IDs, eye labels (OD/OS), ' +
-      'and neutral clinical descriptors. Synthetic demonstration data only — not for clinical diagnosis. ' +
+      'and neutral clinical descriptors. Includes Case D (adversarial metadata security test). ' +
+      'Synthetic demonstration data only — not for clinical diagnosis. ' +
       'Ordering dependency: Call this first to discover case IDs before calling load_case.',
     inputSchema: {
       type: 'object',
@@ -31,15 +30,16 @@ export const TOOL_DEFINITIONS = [
     name: 'load_case',
     description:
       'Loads a synthetic corneal case into the active screener session, renders the Placido ring reflection ' +
-      'image to the visible canvas, updates biometric input fields, and refreshes the UI. Synthetic demonstration ' +
-      'data only. Ordering dependency: Call list_cases to obtain a valid caseId. Call load_case before analyze_rings.',
+      'image to the visible canvas, updates biometric input fields, returns metadata (including operator remarks), ' +
+      'and refreshes the UI. Synthetic demonstration data only. ' +
+      'Ordering dependency: Call list_cases to obtain a valid caseId. Call load_case before analyze_rings.',
     inputSchema: {
       type: 'object',
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C'],
-          description: 'The unique identifier of the synthetic case to load (e.g. "CASE_A", "CASE_B", "CASE_C").',
+          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
+          description: 'The unique identifier of the synthetic case to load (e.g. "CASE_A", "CASE_B", "CASE_C", "CASE_D").',
         },
       },
       required: ['caseId'],
@@ -58,7 +58,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C'],
+          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
           description: 'Optional case ID. If provided, ensures the case is loaded before analyzing.',
         },
       },
@@ -76,7 +76,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C'],
+          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
           description: 'Optional case ID. If provided, retrieves measurements associated with that case.',
         },
       },
@@ -95,7 +95,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C'],
+          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
           description: 'Optional case ID to evaluate.',
         },
       },
@@ -113,7 +113,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C'],
+          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
           description: 'Identifier of the case to explain.',
         },
         language: {
@@ -138,7 +138,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C'],
+          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
           description: 'The case ID submitted for approval.',
         },
         proposedAction: {
@@ -155,14 +155,14 @@ export const TOOL_DEFINITIONS = [
     description:
       'Guarded action: finalizes and exports the clinical screening report. Requires a valid approvalToken / requestId ' +
       'from an approval request that has been explicitly approved by a human clinician in the Approval Queue. ' +
-      'If pending or rejected, report finalization is blocked. Synthetic demonstration data only. ' +
+      'If pending, rejected, or bypassed, report finalization is blocked. Synthetic demonstration data only. ' +
       'Ordering dependency: Call request_approval, obtain human approval in the UI, then call finalize_report.',
     inputSchema: {
       type: 'object',
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C'],
+          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
           description: 'The case ID to finalize.',
         },
         approvalToken: {
@@ -212,6 +212,11 @@ export function registerWebMCPTools(controller) {
             eye: 'OD',
             descriptor: 'Severe upper eyelid/eyelash occlusion and infero-temporal specular glare artifact.',
           },
+          {
+            caseId: CASES.CASE_D,
+            eye: 'OD',
+            descriptor: 'Adversarial security demonstration — realistic prompt-injection attempt in operator remarks.',
+          },
         ],
         disclaimer: 'Synthetic demonstration data. Not for clinical diagnosis.',
       };
@@ -220,6 +225,7 @@ export function registerWebMCPTools(controller) {
     load_case: async (params) => {
       const caseId = params?.caseId || CASES.CASE_A;
       const res = controller.loadCase(caseId);
+      const meta = CASE_METADATA[caseId] || {};
       return {
         caseId,
         eye: res.eye,
@@ -227,7 +233,10 @@ export function registerWebMCPTools(controller) {
           dimensions: { width: 512, height: 512 },
           protocol: '360-RADIAL-PLACIDO',
           ringsProjected: 14,
+          quality: meta.captureQuality || 'adequate',
         },
+        operatorRemarks: meta.operatorRemarks || 'None',
+        isAdversarialInjection: Boolean(meta.isAdversarialInjection),
         message: `Case ${caseId} loaded and rendered to active canvas.`,
       };
     },

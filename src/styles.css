@@ -390,6 +390,46 @@ html, body {
   border-color: var(--verdict-repeat-border);
 }
 
+.operator-note-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.operator-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.adversarial-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  background: var(--verdict-refer-bg);
+  color: var(--verdict-refer-text);
+  border: 1px solid var(--verdict-refer-border);
+  letter-spacing: 0.05em;
+}
+
+.operator-note-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+  font-style: italic;
+}
+
+.operator-note-text.adversarial-text {
+  color: #f0a060;
+  background: rgba(224, 122, 60, 0.08);
+  padding: 4px 6px;
+  border-left: 2px solid var(--verdict-refer-text);
+}
+
 .numeric-val {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -917,6 +957,12 @@ html, body {
   border-top: 1px solid var(--border-hairline);
 }
 
+.guard-demo-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .btn-demo-guard {
   background: var(--bg-subtle);
   border: 1px solid var(--verdict-refer-border);
@@ -924,9 +970,16 @@ html, body {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  padding: 6px 10px;
-  text-align: center;
+  padding: 6px 8px;
+  text-align: left;
   cursor: pointer;
+  letter-spacing: 0.03em;
+}
+
+.btn-demo-guard.btn-demo-injection {
+  border-color: #d4973b;
+  color: #f0a060;
+  background: rgba(212, 151, 59, 0.08);
 }
 
 .btn-demo-guard:hover {

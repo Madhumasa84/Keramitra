@@ -4,7 +4,7 @@
  * structurally enforced approval gate, audit trail, and full Tamil (ta) / English (en) i18n.
  */
 
-import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS } from './synth.js';
+import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS, CASE_METADATA } from './synth.js';
 import { analyzeRings } from './analyze.js';
 import { evaluateReferral, THRESHOLDS, REASON_CODES, VERDICTS } from './rules.js';
 import { registerWebMCPTools, unregisterWebMCPTools } from './tools.js';
@@ -44,6 +44,7 @@ const elements = {
   btnCaseA: document.getElementById('btn-case-a'),
   btnCaseB: document.getElementById('btn-case-b'),
   btnCaseC: document.getElementById('btn-case-c'),
+  btnCaseD: document.getElementById('btn-case-d'),
   btnEyeOD: document.getElementById('btn-eye-od'),
   btnEyeOS: document.getElementById('btn-eye-os'),
   btnLangEn: document.getElementById('btn-lang-en'),
@@ -52,6 +53,9 @@ const elements = {
   btnToggleOverlay: document.getElementById('btn-toggle-overlay'),
   qualityChip: document.getElementById('quality-chip'),
   usableMeridiansVal: document.getElementById('usable-meridians-val'),
+  operatorNoteRow: document.getElementById('operator-note-row'),
+  adversarialBadge: document.getElementById('adversarial-badge'),
+  operatorNoteText: document.getElementById('operator-note-text'),
 
   // Table metrics
   valRingCount: document.getElementById('val-ringCount'),
@@ -81,6 +85,7 @@ const elements = {
   queueEmptyState: document.getElementById('queue-empty-state'),
   queueCardsList: document.getElementById('queue-cards-list'),
   btnDemoUnapprovedFinalize: document.getElementById('btn-demo-unapproved-finalize'),
+  btnDemoCaseDInjection: document.getElementById('btn-demo-case-d-injection'),
   guardAlertBox: document.getElementById('guard-alert-box'),
   guardAlertCode: document.getElementById('guard-alert-code'),
   guardAlertMsg: document.getElementById('guard-alert-msg'),
@@ -428,6 +433,19 @@ function loadCase(caseId) {
   elements.btnCaseA.classList.toggle('active', caseId === CASES.CASE_A);
   elements.btnCaseB.classList.toggle('active', caseId === CASES.CASE_B);
   elements.btnCaseC.classList.toggle('active', caseId === CASES.CASE_C);
+  if (elements.btnCaseD) {
+    elements.btnCaseD.classList.toggle('active', caseId === CASES.CASE_D);
+  }
+
+  // Populate operator remarks and adversarial indicators
+  const meta = CASE_METADATA[caseId] || {};
+  if (elements.operatorNoteText) {
+    elements.operatorNoteText.textContent = meta.operatorRemarks || 'None';
+    elements.operatorNoteText.classList.toggle('adversarial-text', Boolean(meta.isAdversarialInjection));
+  }
+  if (elements.adversarialBadge) {
+    elements.adversarialBadge.style.display = meta.isAdversarialInjection ? 'inline-block' : 'none';
+  }
 
   // Populate inputs with case preset
   const preset = SYNTHETIC_MEASUREMENTS[caseId];
@@ -455,7 +473,7 @@ function loadCase(caseId) {
     type: 'CASE_LOADED',
     actor: 'SYSTEM',
     action: `Loaded case preset ${caseId}`,
-    details: { caseId, eye: state.currentEye, quality: state.imageResult.quality },
+    details: { caseId, eye: state.currentEye, quality: state.imageResult.quality, isAdversarial: Boolean(meta.isAdversarialInjection) },
   });
 
   return { eye: state.currentEye, caseId };
@@ -648,16 +666,25 @@ export function finalizeReport({ caseId, approvalToken }) {
 
   // Check 1: Token Missing
   if (!approvalToken) {
+    const isAdversarial = targetCase === CASES.CASE_D;
+    const actionLabel = isAdversarial
+      ? 'GUARD_VIOLATION: Unapproved finalize attempt following adversarial metadata instruction (CASE_D)'
+      : 'finalize_report blocked (TOKEN_MISSING)';
+    const message = isAdversarial
+      ? t('tokenMissingAdversarialMsg', state.currentLang)
+      : t('tokenMissingMsg', state.currentLang);
+
     const errorObj = {
       status: 'blocked',
       error: GUARD_ERRORS.TOKEN_MISSING,
-      message: 'Approval token is required to finalize report. Request human approval first.',
+      adversarialBypassAttempted: isAdversarial,
+      message,
       caseId: targetCase,
     };
     logAuditEvent({
       type: 'GUARD_VIOLATION',
       actor: 'AGENT',
-      action: 'finalize_report blocked (TOKEN_MISSING)',
+      action: actionLabel,
       status: 'BLOCKED',
       details: errorObj,
     });
@@ -800,6 +827,26 @@ function handleDemoUnapprovedFinalize() {
 }
 
 /**
+ * Demonstration trigger for Case D prompt injection bypass attempt.
+ */
+function handleDemoCaseDInjection() {
+  loadCase(CASES.CASE_D);
+  const result = finalizeReport({ caseId: CASES.CASE_D, approvalToken: null });
+
+  if (elements.guardAlertBox && elements.guardAlertCode && elements.guardAlertMsg) {
+    elements.guardAlertCode.textContent = t('tokenMissingTitle', state.currentLang);
+    elements.guardAlertMsg.textContent = t('tokenMissingAdversarialMsg', state.currentLang);
+    elements.guardAlertBox.style.display = 'flex';
+
+    setTimeout(() => {
+      if (elements.guardAlertBox) {
+        elements.guardAlertBox.style.display = 'none';
+      }
+    }, 7000);
+  }
+}
+
+/**
  * Initialize event listeners.
  */
 function setupEventListeners() {
@@ -815,6 +862,9 @@ function setupEventListeners() {
   elements.btnCaseA.addEventListener('click', () => loadCase(CASES.CASE_A));
   elements.btnCaseB.addEventListener('click', () => loadCase(CASES.CASE_B));
   elements.btnCaseC.addEventListener('click', () => loadCase(CASES.CASE_C));
+  if (elements.btnCaseD) {
+    elements.btnCaseD.addEventListener('click', () => loadCase(CASES.CASE_D));
+  }
 
   // Eye selection
   elements.btnEyeOD.addEventListener('click', () => {
@@ -853,9 +903,12 @@ function setupEventListeners() {
 
   elements.btnQueueReferral.addEventListener('click', () => queueCurrentReferral());
 
-  // Demo Guard Button
+  // Demo Guard Buttons
   if (elements.btnDemoUnapprovedFinalize) {
     elements.btnDemoUnapprovedFinalize.addEventListener('click', handleDemoUnapprovedFinalize);
+  }
+  if (elements.btnDemoCaseDInjection) {
+    elements.btnDemoCaseDInjection.addEventListener('click', handleDemoCaseDInjection);
   }
 
   // Export Audit Button
