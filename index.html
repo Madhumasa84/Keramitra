@@ -3,10 +3,248 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>keramitra</title>
+    <title>Keramitra — Corneal Topography Screener</title>
+    <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="app"></div>
+    <header class="top-bar">
+      <div class="top-bar-branding">
+        <span class="system-title">KERAMITRA</span>
+        <span class="system-subtitle">Placido Mire Topography &amp; Decision Support</span>
+      </div>
+      <div class="top-bar-meta">
+        <span class="meta-item"><span class="meta-label">Protocol</span> 360-RADIAL-PLACIDO</span>
+        <span class="meta-item"><span class="meta-label">Mode</span> MANUAL_SCREENING</span>
+        <span class="meta-item"><span class="meta-label">Engine</span> RULE_v1.0</span>
+      </div>
+    </header>
+
+    <main class="app-layout">
+      <!-- LEFT COLUMN: Case Viewer -->
+      <section class="panel panel-case-viewer" aria-labelledby="heading-case-viewer">
+        <div class="panel-header">
+          <h2 id="heading-case-viewer" class="panel-title">Case viewer</h2>
+          <div class="case-controls-top">
+            <span class="eye-badge" id="eye-badge">OD</span>
+          </div>
+        </div>
+
+        <div class="case-selector-bar">
+          <label for="case-select" class="control-label">Case preset</label>
+          <div class="case-btn-group" role="group" aria-label="Select case preset">
+            <button type="button" class="btn btn-case active" data-case="CASE_A" id="btn-case-a">Case A</button>
+            <button type="button" class="btn btn-case" data-case="CASE_B" id="btn-case-b">Case B</button>
+            <button type="button" class="btn btn-case" data-case="CASE_C" id="btn-case-c">Case C</button>
+          </div>
+        </div>
+
+        <div class="eye-selector-bar">
+          <span class="control-label">Eye</span>
+          <div class="eye-btn-group" role="group" aria-label="Select eye">
+            <button type="button" class="btn btn-eye active" data-eye="OD" id="btn-eye-od">OD (Right)</button>
+            <button type="button" class="btn btn-eye" data-eye="OS" id="btn-eye-os">OS (Left)</button>
+          </div>
+        </div>
+
+        <div class="canvas-container">
+          <canvas id="placido-canvas" width="512" height="512" aria-label="Placido mire reflection canvas"></canvas>
+          <div class="canvas-reticle" aria-hidden="true"></div>
+        </div>
+
+        <div class="viewer-meta-box">
+          <div class="quality-row">
+            <span class="meta-label">Capture quality</span>
+            <span class="quality-chip" id="quality-chip">Evaluating...</span>
+          </div>
+          <div class="meridian-count-row">
+            <span class="meta-label">Usable meridians</span>
+            <span class="numeric-val" id="usable-meridians-val">-- / 360</span>
+          </div>
+        </div>
+
+        <div class="viewer-actions">
+          <button type="button" class="btn btn-primary" id="btn-analyze">Analyze capture</button>
+          <button type="button" class="btn btn-secondary" id="btn-toggle-overlay">Toggle mire overlay</button>
+        </div>
+      </section>
+
+      <!-- CENTRE COLUMN: Evidence -->
+      <section class="panel panel-evidence" aria-labelledby="heading-evidence">
+        <div class="panel-header">
+          <h2 id="heading-evidence" class="panel-title">Evidence</h2>
+          <span class="panel-tag">MEASUREMENTS &amp; DERIVED METRICS</span>
+        </div>
+
+        <div class="evidence-content">
+          <!-- Table 1: Image metrics -->
+          <div class="table-section">
+            <div class="table-header">
+              <h3 class="table-title">Placido ring metrics (analyze.js)</h3>
+              <span class="table-subtitle">Computed across 360 radial meridians</span>
+            </div>
+            <table class="data-table" id="table-image-metrics">
+              <thead>
+                <tr>
+                  <th scope="col">Metric</th>
+                  <th scope="col" class="num-col">Value</th>
+                  <th scope="col">Unit / Scale</th>
+                  <th scope="col">Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr id="metric-row-ringCount">
+                  <td class="metric-name">Ring count (median)</td>
+                  <td class="num-col" id="val-ringCount">--</td>
+                  <td class="unit-cell">crossings</td>
+                  <td class="ref-cell">12 – 16</td>
+                </tr>
+                <tr id="metric-row-spacingCV" class="traceable-row" data-metric="spacingCV">
+                  <td class="metric-name">Spacing CV (inter-ring)</td>
+                  <td class="num-col" id="val-spacingCV">--</td>
+                  <td class="unit-cell">ratio</td>
+                  <td class="ref-cell">&le; 0.08</td>
+                </tr>
+                <tr id="metric-row-isAsymmetry" class="traceable-row" data-metric="isAsymmetry">
+                  <td class="metric-name">I-S asymmetry index</td>
+                  <td class="num-col" id="val-isAsymmetry">--</td>
+                  <td class="unit-cell">normalized &Delta;</td>
+                  <td class="ref-cell">&ge; -0.10</td>
+                </tr>
+                <tr id="metric-row-meridiansUsable" class="traceable-row" data-metric="meridiansUsable">
+                  <td class="metric-name">Usable meridians count</td>
+                  <td class="num-col" id="val-meridiansUsable">--</td>
+                  <td class="unit-cell">meridians</td>
+                  <td class="ref-cell">&ge; 300</td>
+                </tr>
+                <tr id="metric-row-meanInferiorSpacing">
+                  <td class="metric-name">Mean inferior spacing (210°–330°)</td>
+                  <td class="num-col" id="val-meanInferior">--</td>
+                  <td class="unit-cell">px</td>
+                  <td class="ref-cell">--</td>
+                </tr>
+                <tr id="metric-row-meanSuperiorSpacing">
+                  <td class="metric-name">Mean superior spacing (30°–150°)</td>
+                  <td class="num-col" id="val-meanSuperior">--</td>
+                  <td class="unit-cell">px</td>
+                  <td class="ref-cell">--</td>
+                </tr>
+                <tr id="metric-row-centroid">
+                  <td class="metric-name">Centroid position</td>
+                  <td class="num-col" id="val-centroid">--</td>
+                  <td class="unit-cell">px (x, y)</td>
+                  <td class="ref-cell">(256, 256)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Table 2: Clinical measurements -->
+          <div class="table-section">
+            <div class="table-header">
+              <h3 class="table-title">Biometric measurements</h3>
+              <span class="table-subtitle">Manual entry / Device input</span>
+            </div>
+            <table class="data-table" id="table-measurements">
+              <thead>
+                <tr>
+                  <th scope="col">Parameter</th>
+                  <th scope="col" class="num-col">Value</th>
+                  <th scope="col">Unit</th>
+                  <th scope="col">Threshold</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr id="metric-row-K1">
+                  <td class="metric-name"><label for="input-k1">K1 (Flat meridian)</label></td>
+                  <td class="num-col">
+                    <input type="number" step="0.1" id="input-k1" class="num-input" value="43.2" />
+                  </td>
+                  <td class="unit-cell">D</td>
+                  <td class="ref-cell">40.0 – 46.0</td>
+                </tr>
+                <tr id="metric-row-K2" class="traceable-row" data-metric="K2">
+                  <td class="metric-name"><label for="input-k2">K2 (Steep meridian)</label></td>
+                  <td class="num-col">
+                    <input type="number" step="0.1" id="input-k2" class="num-input" value="43.8" />
+                  </td>
+                  <td class="unit-cell">D</td>
+                  <td class="ref-cell">&le; 47.0</td>
+                </tr>
+                <tr id="metric-row-axis">
+                  <td class="metric-name"><label for="input-axis">Astigmatism axis</label></td>
+                  <td class="num-col">
+                    <input type="number" step="1" min="0" max="180" id="input-axis" class="num-input" value="92" />
+                  </td>
+                  <td class="unit-cell">deg</td>
+                  <td class="ref-cell">0 – 180</td>
+                </tr>
+                <tr id="metric-row-pachymetry" class="traceable-row" data-metric="pachymetry">
+                  <td class="metric-name"><label for="input-pachy">Central corneal thickness</label></td>
+                  <td class="num-col">
+                    <input type="number" step="1" id="input-pachy" class="num-input" value="548" />
+                  </td>
+                  <td class="unit-cell">&mu;m</td>
+                  <td class="ref-cell">&ge; 470</td>
+                </tr>
+                <tr id="metric-row-cylinder" class="traceable-row" data-metric="cylinder">
+                  <td class="metric-name"><label for="input-cyl">Cylinder magnitude</label></td>
+                  <td class="num-col">
+                    <input type="number" step="0.05" id="input-cyl" class="num-input" value="0.60" />
+                  </td>
+                  <td class="unit-cell">D</td>
+                  <td class="ref-cell">&le; 1.50</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Verdict and Reason Codes -->
+          <div class="verdict-section">
+            <div class="verdict-header">
+              <span class="control-label">Rule engine verdict</span>
+              <span class="domains-flagged-tag" id="domains-flagged-text">Flagged domains: none</span>
+            </div>
+
+            <div class="verdict-banner" id="verdict-banner">
+              <span class="verdict-label" id="verdict-text">ROUTINE_FOLLOWUP</span>
+            </div>
+
+            <div class="reason-codes-container">
+              <span class="reason-codes-heading">Reason codes (hover to inspect rule &amp; highlight metric source):</span>
+              <div class="chips-list" id="chips-list" role="list">
+                <!-- Chips injected dynamically -->
+              </div>
+            </div>
+
+            <div class="evidence-actions">
+              <button type="button" class="btn btn-primary btn-queue" id="btn-queue-referral">
+                Submit referral for approval
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: Approval Queue -->
+      <section class="panel panel-queue" aria-labelledby="heading-queue">
+        <div class="panel-header">
+          <h2 id="heading-queue" class="panel-title">Approval queue</h2>
+          <span class="queue-count-badge" id="queue-count-badge">0 pending</span>
+        </div>
+
+        <div class="queue-body" id="queue-body">
+          <div class="queue-empty-state" id="queue-empty-state">
+            Pending clinical approval requests and referral sign-offs will appear here when submitted from the evidence panel.
+          </div>
+          <div class="queue-cards-list" id="queue-cards-list" role="list"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="system-footer" role="contentinfo">
+      <span class="footer-banner-text">Synthetic demonstration data. Not for clinical diagnosis.</span>
+    </footer>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
