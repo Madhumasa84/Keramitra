@@ -2,7 +2,10 @@
 
 > A transparent Placido mire topography screener and WebMCP-governed decision support console with structurally enforced human clinical approval and bilingual (English/Tamil) reasoning.
 
-![Keramitra Full Flow Demo](./demo.gif)
+**Live Deployment**: [https://keramitra.vercel.app/](https://keramitra.vercel.app/)  
+**Source Code**: [https://github.com/Madhumasa84/Keramitra](https://github.com/Madhumasa84/Keramitra)
+
+![Keramitra Full Flow Walkthrough](./demo.gif)
 
 ---
 
@@ -22,6 +25,35 @@ To verify whether your browser is executing **Native WebMCP** or the **Compatibi
 
 ```javascript
 console.log(typeof document.modelContext?.registerTool === 'function' ? 'Native WebMCP active' : 'Running on compatibility shim');
+```
+
+---
+
+## Interactive WebMCP Console Walkthrough (30 Seconds)
+
+You can interact with Keramitra directly via its registered WebMCP tools from the browser console (`F12`):
+
+```javascript
+// 1. Discover available synthetic cases
+await window.keramitraTools.invokeTool('list_cases');
+
+// 2. Load Case B (corneal ectasia pattern) to the canvas
+await window.keramitraTools.invokeTool('load_case', { caseId: 'CASE_B' });
+
+// 3. Execute 360-meridian pixel analysis (computes Spacing CV and Asymmetry index)
+await window.keramitraTools.invokeTool('analyze_rings', { caseId: 'CASE_B' });
+
+// 4. Request clinical explanation in Tamil (outreach register)
+await window.keramitraTools.invokeTool('explain_evidence', { caseId: 'CASE_B', language: 'ta' });
+
+// 5. Attempt unapproved report finalization (Blocked: TOKEN_MISSING)
+await window.keramitraTools.invokeTool('finalize_report', { caseId: 'CASE_B', approvalToken: null });
+
+// 6. Queue clinical approval request (Pops up card in visible UI queue)
+await window.keramitraTools.invokeTool('request_approval', {
+  caseId: 'CASE_B',
+  proposedAction: 'Refer to corneal specialist for ectasia assessment'
+});
 ```
 
 ---
