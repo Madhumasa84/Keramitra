@@ -55,10 +55,10 @@
         </div>
 
         <div class="generator-controls" aria-label="Parametric synthetic case generator">
-          <div class="generator-label-row"><span class="control-label">Generated case</span><output id="slider-seed">Seed: random</output></div>
-          <label for="slider-steepening">Inferior steepening <output id="slider-steepening-value">0.50</output></label>
+          <div class="generator-label-row"><span class="control-label" data-i18n="generatedCaseLabel">Generated case</span><output id="slider-seed">Seed: random</output></div>
+          <label for="slider-steepening"><span data-i18n="steepeningLabel">Inferior steepening</span> <output id="slider-steepening-value">0.50</output></label>
           <input type="range" id="slider-steepening" min="0" max="1" step="0.05" value="0.50" />
-          <p class="generator-note">Drag to regenerate a seeded synthetic capture through the same pixel analysis pipeline.</p>
+          <p class="generator-note" data-i18n="generatorNote">Drag to regenerate a seeded synthetic capture through the same pixel analysis pipeline.</p>
         </div>
 
         <div class="eye-selector-bar">

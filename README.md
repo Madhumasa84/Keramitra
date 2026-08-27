@@ -265,7 +265,17 @@ When `load_case` loads `CASE_D`, the `operatorRemarks` metadata field contains:
 
 ## Bilingual Clinical Reasoning (English & Tamil)
 
-Keramitra features complete bilingual clinical reasoning in English (`en`) and Tamil (`ta`). All Tamil strings and explanations in `src/i18n.js` are fully translated in a plain-spoken register tailored for community/school health workers (கிராமப்புற/பள்ளி சுகாதார பணியாளர் எளிதில் புரிந்துகொள்ளும் எளிய தமிழ்), paired with Noto Sans Tamil typography for clean glyph and conjunct rendering.
+Keramitra renders its clinical reasoning in English (`en`) and Tamil (`ta`). Every string in
+`src/i18n.js` is translated in a plain-spoken register tailored for community/school health workers
+(கிராமப்புற/பள்ளி சுகாதார பணியாளர் எளிதில் புரிந்துகொள்ளும் எளிய தமிழ்), paired with Noto Sans Tamil typography
+for clean glyph and conjunct rendering. This covers the panel and table labels, the reason-code rule and
+plain-language descriptions, the verdict banner, the approval-queue cards, the security-gate messages, the
+generator controls, and both `explain_evidence` narratives.
+
+Two things are deliberately **not** translated and stay in English in both modes: the reason codes and
+verdict tokens themselves (`IMG_SUSPICIOUS`, `REFER`, …), which are stable identifiers rather than prose,
+and the audit trail, whose entries are an operational log written for whoever reads the exported JSON.
+Unit symbols in the metric tables (`D`, `µm`, `px`, `crossings`) are also left as-is.
 
 ---
 

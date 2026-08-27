@@ -141,6 +141,11 @@ function applyLanguage(lang) {
   updateUI();
   renderApprovalQueue();
   updateWebMCPStatus(syncWebMCPToolSurface(appController));
+  if (elements.sliderSeed) {
+    elements.sliderSeed.textContent = state.generatedCase
+      ? `${t('seedPrefix', lang)}${state.generatedCase.seed}`
+      : `${t('seedPrefix', lang)}${t('seedRandom', lang)}`;
+  }
 }
 
 /**
@@ -528,7 +533,7 @@ function loadGeneratedCase(generatedCase, actor = 'AGENT') {
   state.generatedCase = generatedCase;
   [elements.btnCaseA, elements.btnCaseB, elements.btnCaseC, elements.btnCaseD].filter(Boolean).forEach((button) => button.classList.remove('active'));
   if (elements.operatorNoteText) {
-    elements.operatorNoteText.textContent = `Generated synthetic capture (seed ${generatedCase.seed}); no operator metadata.`;
+    elements.operatorNoteText.textContent = `${t('generatedOperatorNote', state.currentLang)} (${t('seedPrefix', state.currentLang)}${generatedCase.seed})`;
     elements.operatorNoteText.classList.remove('adversarial-text');
   }
   if (elements.adversarialBadge) elements.adversarialBadge.style.display = 'none';
@@ -540,7 +545,7 @@ function loadGeneratedCase(generatedCase, actor = 'AGENT') {
   evaluateCurrentState();
   if (elements.sliderSteepening) elements.sliderSteepening.value = generatedCase.renderParams.steepening;
   if (elements.sliderSteepeningValue) elements.sliderSteepeningValue.textContent = generatedCase.renderParams.steepening.toFixed(2);
-  if (elements.sliderSeed) elements.sliderSeed.textContent = `Seed: ${generatedCase.seed}`;
+  if (elements.sliderSeed) elements.sliderSeed.textContent = `${t('seedPrefix', state.currentLang)}${generatedCase.seed}`;
   logAuditEvent({ type: 'CASE_GENERATED', actor, action: `Generated ${generatedCase.caseId}`, details: { caseId: generatedCase.caseId, seed: generatedCase.seed, renderParams: generatedCase.renderParams } });
   syncWebMCPToolSurface(appController);
   return generatedCase;
