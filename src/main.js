@@ -19,6 +19,7 @@ export const GUARD_ERRORS = {
   APPROVAL_REJECTED: 'APPROVAL_REJECTED',
   TOKEN_NOT_FOUND: 'TOKEN_NOT_FOUND',
   TOKEN_STALE_MEASUREMENTS: 'TOKEN_STALE_MEASUREMENTS',
+  APPROVAL_RECORD_MISSING: 'APPROVAL_RECORD_MISSING',
 };
 
 // In-Memory Token Registry (Single-use, ephemeral, bound to requestId + caseId)
@@ -786,6 +787,7 @@ function queueCurrentReferral(proposedAction = '') {
     proposedAction: proposedAction || defaultAction,
     verdict: state.referralResult.verdict,
     reasonCodes: [...state.referralResult.reasonCodes],
+    domainsFlagged: [...state.referralResult.domainsFlagged],
     measurements: { ...state.measurements },
     imageResult: state.imageResult,
     status: 'PENDING',
@@ -940,6 +942,29 @@ export function finalizeReport({ caseId, approvalToken }) {
     return errorObj;
   }
 
+  // Check 6: The approval record the token was minted from must still be present.
+  // The report has to describe what the clinician actually signed off, so live
+  // application state is not a safe source: load_case and generate_case move
+  // state without invalidating a token. Fail closed rather than substitute.
+  const approvedRequest = state.approvalQueue.find((item) => item.id === tokenObj.requestId);
+  if (!approvedRequest) {
+    const errorObj = {
+      status: 'blocked',
+      error: GUARD_ERRORS.APPROVAL_RECORD_MISSING,
+      message: `Approval record '${tokenObj.requestId}' for this token is no longer in the session queue.`,
+      caseId: targetCase,
+      approvalToken,
+    };
+    logAuditEvent({
+      type: 'GUARD_VIOLATION',
+      actor: 'AGENT',
+      action: 'finalize_report blocked (APPROVAL_RECORD_MISSING)',
+      status: 'BLOCKED',
+      details: errorObj,
+    });
+    return errorObj;
+  }
+
   // Token Valid — Consume token (Single-use enforcement)
   tokenObj.used = true;
   tokenObj.usedAt = new Date().toISOString();
@@ -948,11 +973,11 @@ export function finalizeReport({ caseId, approvalToken }) {
     status: 'finalized',
     caseId: targetCase,
     approvalToken,
-    verdict: state.referralResult.verdict,
-    reasonCodes: state.referralResult.reasonCodes,
-    domainsFlagged: state.referralResult.domainsFlagged,
-    measurements: { ...state.measurements },
-    imageMetrics: { ...state.imageResult.metrics },
+    verdict: approvedRequest.verdict,
+    reasonCodes: [...approvedRequest.reasonCodes],
+    domainsFlagged: [...(approvedRequest.domainsFlagged || [])],
+    measurements: { ...approvedRequest.measurements },
+    imageMetrics: { ...approvedRequest.imageResult.metrics },
     clinicalSignOff: {
       requestId: tokenObj.requestId,
       mintedAt: new Date(tokenObj.mintedAt).toISOString(),
@@ -970,8 +995,7 @@ export function finalizeReport({ caseId, approvalToken }) {
     details: { caseId: targetCase, approvalToken, verdict: successObj.verdict },
   });
 
-  const queueItem = state.approvalQueue.find((item) => item.approvalToken === approvalToken);
-  if (queueItem) queueItem.status = 'FINALIZED';
+  approvedRequest.status = 'FINALIZED';
   renderApprovalQueue();
   syncWebMCPToolSurface(appController);
 

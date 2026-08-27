@@ -187,6 +187,14 @@ Calling `finalize_report` performs exhaustive pre-flight verification against th
 | **Token Re-use** | Attempting to call `finalize_report` a second time with the same token. | `{"status": "blocked", "error": "TOKEN_ALREADY_USED"}` | Single-use consumption enforced. |
 | **Token Expiry** | Token presented > 300 seconds (5 minutes) after minting. | `{"status": "blocked", "error": "TOKEN_EXPIRED"}` | Expired credentials rejected. |
 | **Measurements Changed After Approval** | A clinician-approved case is mutated through the editable table or `set_measurements`. | `{"status": "blocked", "error": "TOKEN_STALE_MEASUREMENTS"}` | The visible card becomes stale and the token cannot finalize a report describing superseded measurements. A new human approval is required. |
+| **Approval Record Missing** | The approval request a token was minted from is no longer in the session queue. | `{"status": "blocked", "error": "APPROVAL_RECORD_MISSING"}` | The gate fails closed rather than describing the report from live application state. |
+
+The finalized report body is read from the approved request record, not from live
+application state. `load_case` and `generate_case` move the active case without
+invalidating an outstanding token, so a report is always rendered from the verdict,
+reason codes, measurements, and image metrics that were on the card the clinician
+signed off.
+
 ---
 
 ## Case D Adversarial-Metadata Fixture
