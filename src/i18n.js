@@ -20,6 +20,10 @@ export const STRINGS = {
     modeLabel: 'Mode',
     modeVal: 'MANUAL_SCREENING',
     webmcpLabel: 'WebMCP',
+    noHostBanner: 'No WebMCP host detected — neither document.modelContext nor navigator.modelContext is present, so no tools are registered and no agent can discover them. The tools are still callable by hand from the DevTools console via window.keramitraTools. Enable the WebMCP preview flag in Chrome Canary/Dev for native execution.',
+    badgeNoHost: 'NO WebMCP HOST — CONSOLE ONLY',
+    badgeNoHostTitle: 'No document.modelContext or navigator.modelContext. Nothing is registered with a host; window.keramitraTools remains callable from the console.',
+    badgeNativeTitle: 'Native WebMCP (document.modelContext) active and connected.',
 
     // Panels & Headers
     caseViewerTitle: 'Case viewer',
@@ -140,6 +144,10 @@ export const STRINGS = {
     modeLabel: 'பயன்முறை',
     modeVal: 'நேரடி பரிசோதனை',
     webmcpLabel: 'WebMCP',
+    noHostBanner: 'WebMCP ஹோஸ்ட் எதுவும் கண்டறியப்படவில்லை — document.modelContext அல்லது navigator.modelContext இரண்டுமே இல்லை. எனவே எந்தக் கருவியும் பதிவு செய்யப்படவில்லை; எந்த ஏஜென்டும் இவற்றைக் கண்டறிய முடியாது. DevTools கன்சோலில் window.keramitraTools மூலம் மட்டுமே அழைக்க முடியும். நேட்டிவ் இயக்கத்திற்கு Chrome Canary/Dev-இல் WebMCP முன்னோட்ட ஃபிளாக்கை இயக்கவும்.',
+    badgeNoHost: 'WebMCP ஹோஸ்ட் இல்லை — கன்சோல் மட்டும்',
+    badgeNoHostTitle: 'document.modelContext / navigator.modelContext இல்லை. எந்தக் கருவியும் ஹோஸ்டில் பதிவு செய்யப்படவில்லை; window.keramitraTools கன்சோலில் இயங்கும்.',
+    badgeNativeTitle: 'நேட்டிவ் WebMCP (document.modelContext) இயங்குகிறது.',
 
     // Panels & Headers
     caseViewerTitle: 'கண் பார்வை படம்',

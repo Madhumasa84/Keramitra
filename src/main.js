@@ -140,6 +140,7 @@ function applyLanguage(lang) {
   // Re-render dynamic components with translated strings
   updateUI();
   renderApprovalQueue();
+  updateWebMCPStatus(syncWebMCPToolSurface(appController));
 }
 
 /**
@@ -1173,23 +1174,27 @@ function updateWebMCPStatus(registrationResult) {
   const webmcpBadge = document.getElementById('webmcp-badge');
   const shimBar = document.getElementById('shim-announcement-bar');
   if (registrationResult.modelContextAvailable) {
-  if (webmcpBadge) {
-    webmcpBadge.textContent = `NATIVE WebMCP [${registrationResult.toolsCount} TOOLS]`;
-    webmcpBadge.className = 'webmcp-badge active';
-    webmcpBadge.title = 'Native WebMCP (document.modelContext) active and connected.';
-  }
-  if (shimBar) {
-    shimBar.style.display = 'none';
-  }
+    if (webmcpBadge) {
+      webmcpBadge.textContent = `NATIVE WebMCP [${registrationResult.toolsCount} TOOLS]`;
+      webmcpBadge.className = 'webmcp-badge active';
+      webmcpBadge.title = t('badgeNativeTitle', state.currentLang);
+    }
+    if (shimBar) {
+      shimBar.style.display = 'none';
+    }
   } else {
-  if (webmcpBadge) {
-    webmcpBadge.textContent = `COMPATIBILITY SHIM [${registrationResult.toolsCount} TOOLS]`;
-    webmcpBadge.className = 'webmcp-badge shimmed';
-    webmcpBadge.title = 'Native document.modelContext not detected. Running on WebMCP compatibility shim.';
-  }
-  if (shimBar) {
-    shimBar.style.display = 'block';
-  }
+    // There is no shim. When no host exposes modelContext nothing is registered and
+    // no agent can discover the tools; only window.keramitraTools is reachable, by
+    // hand, from the console. Say that rather than printing a tool count next to a
+    // capability the page does not have.
+    if (webmcpBadge) {
+      webmcpBadge.textContent = t('badgeNoHost', state.currentLang);
+      webmcpBadge.className = 'webmcp-badge shimmed';
+      webmcpBadge.title = t('badgeNoHostTitle', state.currentLang);
+    }
+    if (shimBar) {
+      shimBar.style.display = 'block';
+    }
   }
 }
 

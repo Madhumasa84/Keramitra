@@ -12,7 +12,7 @@
 
 1. Open the ChatGPT desktop app’s in-app browser.
 2. Visit [https://keramitra.vercel.app/](https://keramitra.vercel.app/).
-3. Confirm the header shows **NATIVE WebMCP [9 TOOLS]** and no shim banner; submit an approval request and watch it become **[10 TOOLS]**.
+3. Confirm the header shows **NATIVE WebMCP [9 TOOLS]** and no warning banner; submit an approval request and watch it become **[10 TOOLS]**.
 4. Ask the agent: **“Review Case B and complete the screening workflow.”** Watch the case, evidence metrics, verdict, approval queue, and audit trail update as tools run.
 5. Select Case D and ask the same question. Its adversarial fixture metadata is visible to the agent; the deterministic demo path shows that a missing token is blocked with **TOKEN_MISSING** and logged as **GUARD_VIOLATION**.
 
@@ -37,11 +37,16 @@
 
 ## Optional developer verification (2 seconds in DevTools)
 
-To verify whether your browser is executing **Native WebMCP** or the **Compatibility Shim**, paste this one-liner into the Chrome DevTools Console (`F12`):
+To check whether a WebMCP host is present, paste this one-liner into the Chrome DevTools Console (`F12`). It checks both locations the page accepts:
 
 ```javascript
-console.log(typeof document.modelContext?.registerTool === 'function' ? 'Native WebMCP active' : 'Running on compatibility shim');
+const mc = document.modelContext ?? navigator.modelContext;
+console.log(typeof mc?.registerTool === 'function'
+  ? 'WebMCP host present — tools are registered and discoverable by an agent'
+  : 'No WebMCP host — nothing is registered; window.keramitraTools is callable from this console only');
 ```
+
+There is **no compatibility shim**. When no host exposes `modelContext`, Keramitra registers nothing and no agent can discover its tools; the header says `NO WebMCP HOST — CONSOLE ONLY` and the tools remain reachable only by hand through `window.keramitraTools`, which is what the walkthrough below uses.
 
 ---
 
@@ -245,7 +250,7 @@ Keramitra resolves `document.modelContext` first and accepts `navigator.modelCon
 ```javascript
 const modelContext = document.modelContext ?? navigator.modelContext;
 ```
-If neither is native in the host browser, the UI clearly labels its compatibility shim as a fallback; native `document.modelContext` remains the primary path.
+If neither is present, no tools are registered with any host and the header says so plainly (`NO WebMCP HOST — CONSOLE ONLY`), with a banner explaining that `window.keramitraTools` is the only remaining entry point. Nothing is polyfilled and no shim is installed.
 
 ---
 

@@ -30,8 +30,8 @@
       </div>
     </header>
 
-    <div class="shim-announcement-bar" id="shim-announcement-bar" style="display: none;" role="alert">
-      Running on compatibility shim — native WebMCP (document.modelContext) not detected. Enable Chrome 149+ preview flags for native execution.
+    <div class="shim-announcement-bar" id="shim-announcement-bar" style="display: none;" role="alert" data-i18n="noHostBanner">
+      No WebMCP host detected — neither document.modelContext nor navigator.modelContext is present, so no tools are registered and no agent can discover them. The tools below are still callable by hand from the DevTools console via window.keramitraTools. Enable the WebMCP preview flag in Chrome Canary/Dev for native execution.
     </div>
 
     <main class="app-layout">
