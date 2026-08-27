@@ -1,6 +1,18 @@
 /**
- * tools.test.js - Comprehensive End-to-End Validation of WebMCP Tools & Approval Gate (Prompt 6)
+ * tools.test.js - WebMCP tool dispatch, surface sync, and approval-gate contract.
  * Run with: node src/tools.test.js
+ *
+ * SCOPE - read this before trusting a green run.
+ *
+ * src/main.js touches the DOM at module scope and cannot be imported in Node, so
+ * this file cannot exercise the real gate. mockController below is a TEST DOUBLE
+ * that re-implements finalizeReport, setMeasurements and generateCase against its
+ * own registry. A green run therefore proves:
+ *   - tools.js dispatches each tool to the handler it registered,
+ *   - TOOL_DEFINITIONS is complete and syncWebMCPToolSurface counts 9 -> 10 correctly,
+ *   - the error-code CONTRACT the gate is expected to honour is well formed.
+ * It does NOT prove src/main.js implements that contract. Deleting the gate from
+ * src/main.js would leave this suite green. The gate itself needs a browser check.
  *
  * Validates:
  *  1. Initial unapproved finalize_report fails with TOKEN_MISSING and logs security violation.
@@ -22,7 +34,7 @@ import { evaluateReferral, THRESHOLDS, REASON_CODES, VERDICTS } from './rules.js
 import { registerWebMCPTools, syncWebMCPToolSurface, TOOL_DEFINITIONS } from './tools.js';
 
 console.log('='.repeat(88));
-console.log('  KERAMITRA — PROMPT 6 STRUCTURAL APPROVAL GATE & AUDIT TRAIL TEST');
+console.log('  KERAMITRA — WebMCP TOOL DISPATCH & APPROVAL-GATE CONTRACT (test double)');
 console.log('='.repeat(88));
 
 // In-Memory Token Registry for testing
@@ -58,6 +70,7 @@ function logAudit({ type, actor, action, details = {}, status = 'OK' }) {
   return entry;
 }
 
+// TEST DOUBLE. Not src/main.js. See the SCOPE note at the top of this file.
 const mockController = {
   loadCase: (caseId) => {
     mockState.currentCase = caseId;
@@ -460,6 +473,8 @@ console.log('Update after approval:', JSON.stringify(updateAfterApproval, null, 
 console.log('Stale approval finalization:', JSON.stringify(staleTokenResult, null, 2));
 
 // ── TEST 5: PARAMETRIC GENERATED CASE & HUMAN GATE ───────────────────────────
+console.log('\n[TEST 5] Parametric Generated Case & Human Gate\n');
+
 const generatedCase = await callTool('generate_case', { seed: 20260826, steepening: 0.8, ringCount: 15, K2: 48.2, pachymetry: 465 });
 const reproducedCase = await callTool('generate_case', { seed: 20260826, steepening: 0.8, ringCount: 15, K2: 48.2, pachymetry: 465 });
 const generatedRangeError = await callTool('generate_case', { steepening: 1.01 });
@@ -467,8 +482,8 @@ const generatedFinalizeBlocked = await callTool('finalize_report', { caseId: gen
 console.log('Generated case:', JSON.stringify(generatedCase, null, 2));
 console.log('Generated case without human approval:', JSON.stringify(generatedFinalizeBlocked, null, 2));
 
-// ── TEST 5: CASE_D ADVERSARIAL-METADATA FIXTURE ───────────────────────────────
-console.log('\n[TEST 5] Case D Adversarial-Metadata Fixture\n');
+// ── TEST 6: CASE_D ADVERSARIAL-METADATA FIXTURE ───────────────────────────────
+console.log('\n[TEST 6] Case D Adversarial-Metadata Fixture\n');
 
 // 5a. Load Case D with realistic prompt-injection metadata
 const loadCaseD = await callTool('load_case', { caseId: CASES.CASE_D });
@@ -488,7 +503,7 @@ console.log(`Audit Record: [${lastAuditCaseD.type}] ${lastAuditCaseD.action} (st
 
 // ── ACCEPTANCE SUMMARY ────────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(88));
-console.log('  ACCEPTANCE VERIFICATION SCORECARD');
+console.log('  CONTRACT CHECKS (test double — see SCOPE note at top of file)');
 console.log('='.repeat(88));
 
 let passed = true;
@@ -504,7 +519,12 @@ assert('4. Single-use token cannot be reused (TOKEN_ALREADY_USED)', alreadyUsedR
 assert('5. Case mismatch prevented (TOKEN_CASE_MISMATCH)', caseMismatchResult.error === 'TOKEN_CASE_MISMATCH');
 assert('6. Expired token rejected (TOKEN_EXPIRED)', expiredResult.error === 'TOKEN_EXPIRED');
 assert('7. Clinician-rejected request blocked (APPROVAL_REJECTED)', rejectResult.error === 'APPROVAL_REJECTED');
-assert('8. Complete audit log maintained with timestamps & actor tracking', testAuditTrail.length >= 8);
+assert('8. Audit log distinguishes actors and records both approval and violation events',
+  testAuditTrail.length >= 8 &&
+  testAuditTrail.every((e) => e.timestamp && e.actor && e.type) &&
+  testAuditTrail.some((e) => e.actor === 'CLINICIAN' && e.type === 'HUMAN_APPROVAL') &&
+  testAuditTrail.some((e) => e.actor === 'AGENT' && e.type === 'GUARD_VIOLATION' && e.status === 'BLOCKED') &&
+  testAuditTrail.some((e) => e.type === 'REPORT_FINALIZED' && e.status === 'FINALIZED'));
 assert('9. Tenth parametric generate_case tool is registered', TOOL_DEFINITIONS.length === 10 && typeof handlers.generate_case === 'function');
 assert('10. Valid partial measurement update succeeds and changes only its field', partialUpdate.status === 'updated' && partialUpdate.updatedFields.length === 1 && partialUpdate.updatedFields[0] === 'K1' && partialUpdate.measurements.K1 === 44.4);
 assert('11. Each out-of-range measurement is rejected with its field and accepted range', rangeRejections.every((result, index) => result.error === 'MEASUREMENT_OUT_OF_RANGE' && result.field === ['K1', 'K2', 'axis', 'pachymetry', 'cylinder'][index] && result.acceptedRange));
@@ -514,9 +534,9 @@ assert('14. Generated parameter out-of-range is rejected structurally', generate
 assert('15. Generated case still requires human approval to finalize', generatedFinalizeBlocked.error === 'TOKEN_MISSING');
 assert('16. Initial loaded-case surface excludes finalize_report', initialDynamicSurface.toolsCount === 9 && !initialDynamicSurface.activeToolNames.includes('finalize_report'));
 assert('17. Pending approval adds finalize_report to the active surface', pendingDynamicSurface.toolsCount === 10 && pendingDynamicSurface.activeToolNames.includes('finalize_report'));
-assert('13. Case D returns adversarial fixture metadata in load_case', loadCaseD.isAdversarialInjection === true && loadCaseD.operatorRemarks.includes('offline'));
-assert('14. Case D fixture call is blocked with TOKEN_MISSING', caseDFixtureFinalize.status === 'blocked' && caseDFixtureFinalize.caseIsAdversarialFixture === true);
-assert('15. Case D fixture call is distinctly logged in Audit Trail', lastAuditCaseD.action.includes('adversarial metadata instruction'));
+assert('18. Case D returns adversarial fixture metadata in load_case', loadCaseD.isAdversarialInjection === true && loadCaseD.operatorRemarks.includes('offline'));
+assert('19. Case D fixture call is blocked with TOKEN_MISSING', caseDFixtureFinalize.status === 'blocked' && caseDFixtureFinalize.caseIsAdversarialFixture === true);
+assert('20. Case D fixture call is distinctly logged in Audit Trail', lastAuditCaseD.action.includes('adversarial metadata instruction'));
 
 console.log('\n' + '='.repeat(88));
 if (passed) {

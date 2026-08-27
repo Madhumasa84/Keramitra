@@ -69,25 +69,25 @@ let passed = true;
 const aCVOk = caseA.spacingCV < 0.05;
 const aAsymOk = Math.abs(caseA.isAsymmetry) < 0.05;
 const aQualityOk = caseA.quality === 'adequate';
-console.log(`✓ Case A low spacingCV (< 0.05): ${caseA.spacingCV} → ${aCVOk ? 'PASS' : 'FAIL'}`);
-console.log(`✓ Case A near-zero isAsymmetry (|asym| < 0.05): ${caseA.isAsymmetry} → ${aAsymOk ? 'PASS' : 'FAIL'}`);
-console.log(`✓ Case A quality == adequate: ${caseA.quality} → ${aQualityOk ? 'PASS' : 'FAIL'}`);
+console.log(`${aCVOk ? '✓' : '✗'} Case A low spacingCV (< 0.05): ${caseA.spacingCV} → ${aCVOk ? 'PASS' : 'FAIL'}`);
+console.log(`${aAsymOk ? '✓' : '✗'} Case A near-zero isAsymmetry (|asym| < 0.05): ${caseA.isAsymmetry} → ${aAsymOk ? 'PASS' : 'FAIL'}`);
+console.log(`${aQualityOk ? '✓' : '✗'} Case A quality == adequate: ${caseA.quality} → ${aQualityOk ? 'PASS' : 'FAIL'}`);
 
 if (!aCVOk || !aAsymOk || !aQualityOk) passed = false;
 
 // Check B: clearly negative isAsymmetry
 const bAsymOk = caseB.isAsymmetry < -0.15;
 const bQualityOk = caseB.quality === 'adequate';
-console.log(`✓ Case B clearly negative isAsymmetry (< -0.15): ${caseB.isAsymmetry} → ${bAsymOk ? 'PASS' : 'FAIL'}`);
-console.log(`✓ Case B quality == adequate: ${caseB.quality} → ${bQualityOk ? 'PASS' : 'FAIL'}`);
+console.log(`${bAsymOk ? '✓' : '✗'} Case B clearly negative isAsymmetry (< -0.15): ${caseB.isAsymmetry} → ${bAsymOk ? 'PASS' : 'FAIL'}`);
+console.log(`${bQualityOk ? '✓' : '✗'} Case B quality == adequate: ${caseB.quality} → ${bQualityOk ? 'PASS' : 'FAIL'}`);
 
 if (!bAsymOk || !bQualityOk) passed = false;
 
 // Check C: meridiansUsable below threshold (< 300) and repeat_required
 const cMeridiansOk = caseC.meridiansUsable < 300;
 const cQualityOk = caseC.quality === 'repeat_required';
-console.log(`✓ Case C meridiansUsable < 300: ${caseC.meridiansUsable}/360 → ${cMeridiansOk ? 'PASS' : 'FAIL'}`);
-console.log(`✓ Case C quality == repeat_required: ${caseC.quality} → ${cQualityOk ? 'PASS' : 'FAIL'}`);
+console.log(`${cMeridiansOk ? '✓' : '✗'} Case C meridiansUsable < 300: ${caseC.meridiansUsable}/360 → ${cMeridiansOk ? 'PASS' : 'FAIL'}`);
+console.log(`${cQualityOk ? '✓' : '✗'} Case C quality == repeat_required: ${caseC.quality} → ${cQualityOk ? 'PASS' : 'FAIL'}`);
 
 if (!cMeridiansOk || !cQualityOk) passed = false;
 

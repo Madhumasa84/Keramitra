@@ -8,8 +8,11 @@
  *   CASE_C → REPEAT_SCAN
  *
  * Load-bearing proof:
- *   Remove the image domain from CASE_B and confirm the verdict degrades
- *   from REFER to a weaker result, proving the image path contributes.
+ *   Remove the image domain from CASE_B and confirm IMG_SUSPICIOUS disappears
+ *   from the reason codes, proving the image path contributes an independent
+ *   signal. Note the verdict itself stays REFER: K_HIGH + PACHY_LOW are already
+ *   two domains, so TWO_DOMAIN_ABNORMAL still fires without the image. The
+ *   reason codes, not the verdict, are what this proves.
  */
 
 import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS } from './synth.js';
@@ -72,8 +75,10 @@ console.log('\n' + DASH);
 console.log('[Phase 2] Load-bearing proof — remove image domain from CASE_B\n');
 console.log('Constructing a "stub" imageResult that reports quality=adequate');
 console.log('but with spacingCV=0, isAsymmetry=0 — i.e. a structurally normal image.\n');
-console.log('If the verdict degrades (≠ REFER via TWO_DOMAIN_ABNORMAL) we prove');
-console.log('the image path is genuinely load-bearing.\n');
+console.log('The verdict is expected to stay REFER: keratometry + pachymetry are already');
+console.log('two abnormal domains without the image. What proves the image path is');
+console.log('load-bearing is IMG_SUSPICIOUS being present with the real image and absent');
+console.log('with the stub — an independent third signal that only the pixels can supply.\n');
 
 const caseBMeasurements = SYNTHETIC_MEASUREMENTS[CASES.CASE_B];
 
@@ -205,15 +210,17 @@ check(
   withRealImage.verdict,
 );
 check(
-  'Stub image (image zeroed) → verdict changes OR IMG_SUSPICIOUS is absent',
-  withStubImage.verdict !== withRealImage.verdict ||
-    !withStubImage.reasonCodes.includes(REASON_CODES.IMG_SUSPICIOUS),
-  `stub verdict=${withStubImage.verdict}, real verdict=${withRealImage.verdict}`,
+  'Stub image (image zeroed) → image domain is no longer flagged',
+  withRealImage.domainsFlagged.includes('image') &&
+    !withStubImage.domainsFlagged.includes('image'),
+  `real domains=${JSON.stringify(withRealImage.domainsFlagged)}, stub domains=${JSON.stringify(withStubImage.domainsFlagged)}`,
 );
 check(
-  'Stub image drops TWO_DOMAIN_ABNORMAL (only K+Pachy = 2 domains — still met) OR IMG_SUSPICIOUS absent',
-  !withStubImage.reasonCodes.includes(REASON_CODES.IMG_SUSPICIOUS),
-  `stub codes: ${JSON.stringify(withStubImage.reasonCodes)}`,
+  'Stub image keeps TWO_DOMAIN_ABNORMAL (K+Pachy alone are already 2 domains)',
+  withStubImage.reasonCodes.includes(REASON_CODES.TWO_DOMAIN_ABNORMAL) &&
+    withStubImage.domainsFlagged.length === 2 &&
+    !withStubImage.domainsFlagged.includes('image'),
+  `stub domains: ${JSON.stringify(withStubImage.domainsFlagged)}`,
 );
 
 // Clarifying note: K_HIGH + PACHY_LOW alone = 2 domains → TWO_DOMAIN_ABNORMAL still
