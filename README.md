@@ -107,23 +107,48 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 Keramitra defines ten WebMCP tools. The surface is dynamic: a loaded case initially exposes nine tools, and `finalize_report` becomes the tenth only while the active case has a pending or approved approval request. The tools call the same application controller used by the visible UI.
 
-Native execution registers the project’s real **load_case** tool on **document.modelContext**:
+Registration happens in `syncWebMCPToolSurface` (`src/tools.js`), which diffs the desired
+surface against what is already registered and calls `registerTool` for each newly relevant
+tool. This is the actual call, verbatim:
 
 ~~~javascript
-document.modelContext.registerTool({
+// src/tools.js — inside syncWebMCPToolSurface()
+desired.forEach((name) => {
+  if (registered.has(name)) return;
+  const toolDef = TOOL_DEFINITIONS.find((tool) => tool.name === name);
+  try {
+    modelContext.registerTool({ name, description: toolDef.description, inputSchema: toolDef.inputSchema, execute: registeredToolHandlers[name] });
+    registered.add(name);
+  } catch (err) { console.warn(`WebMCP registration for ${name} encountered:`, err); }
+});
+~~~
+
+`modelContext` is `document.modelContext ?? navigator.modelContext`, `toolDef` is the entry in
+the exported `TOOL_DEFINITIONS` array, and `execute` is the handler the visible UI calls — the
+same function object, not a wrapper. The `load_case` entry it registers is:
+
+~~~javascript
+// src/tools.js — TOOL_DEFINITIONS[1]
+{
   name: 'load_case',
-  description: 'Loads a synthetic corneal case into the active screener session.',
+  description:
+    'Loads a synthetic corneal case into the active screener session, renders the Placido ring reflection ' +
+    'image to the visible canvas, updates biometric input fields, returns metadata (including operator remarks), ' +
+    'and refreshes the UI. Synthetic demonstration data only. ' +
+    'Ordering dependency: Call list_cases to obtain a valid caseId. Call load_case before analyze_rings.',
   inputSchema: {
     type: 'object',
     properties: {
-      caseId: { type: 'string', enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'] }
+      caseId: {
+        type: 'string',
+        enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
+        description: 'The unique identifier of the synthetic case to load (e.g. "CASE_A", "CASE_B", "CASE_C", "CASE_D").',
+      },
     },
     required: ['caseId'],
-    additionalProperties: false
+    additionalProperties: false,
   },
-  execute: async ({ caseId }) =>
-    window.keramitraTools.invokeTool('load_case', { caseId })
-});
+}
 ~~~
 All tool input schemas are JSON objects with `additionalProperties: false`; the table shows the accepted properties, types, ranges, and required fields.
 The handlers enforce these themselves rather than relying on the host to validate: an unknown `caseId`, a `GEN_<seed>` id that is not the active view, a missing required argument, or a `language` outside `en | ta` is rejected with a structured error instead of being coerced to a default.
@@ -228,7 +253,7 @@ When `load_case` loads `CASE_D`, the `operatorRemarks` metadata field contains:
    - **Zero hardcoding**: The function has no knowledge of `caseId` or case parameters.
    - Locates the disc center via intensity-weighted centroid calculations.
    - Samples 360 radial meridians (1° intervals) using bilinear sub-pixel interpolation.
-   - Detects ring crossing peaks using local curvature and adaptive intensity thresholds.
+   - Detects ring crossing peaks by local-maximum search with a fixed prominence floor (18.0), a fixed intensity floor (40), and a 6 px minimum peak separation, then refines each peak to sub-pixel position with a parabolic fit. (The adaptive threshold in the pipeline is in the centroid step above, not in peak detection.)
    - Computes inter-ring spacing Coefficient of Variation (`spacingCV`) and Inferior-Superior asymmetry index (`isAsymmetry = (inferior - superior) / mean`).
    - Flags unusable meridians based on saturation (glare) and low-variance flat occlusion (eyelids).
 3. **Deterministic Multi-Domain Rules (`src/rules.js`)**:
