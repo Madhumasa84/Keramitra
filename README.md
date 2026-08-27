@@ -137,7 +137,7 @@ The handlers enforce these themselves rather than relying on the host to validat
 | `evaluate_referral` | `{ caseId?: ActiveCaseId }` | **5. Case-scoped.** Run after the current image and biometrics are available (they are created by load/generate and refreshed by mutation). | Runs the deterministic three-domain rule engine and returns verdict, reason codes, and flagged domains. |
 | `explain_evidence` | `{ caseId?: ActiveCaseId, language: "en" \| "ta" }` | **6a. Case-scoped.** `language` is required; normally call after evaluation. | Returns plain-language evidence reasoning in English or Tamil. |
 | `request_approval` | `{ caseId: ActiveCaseId, proposedAction: string }` | **6b. Case-scoped.** Call after evaluation. | Adds a visible approval card and returns `{ status: "pending", requestId }`; it does not return a token. |
-| `finalize_report` | `{ caseId: ActiveCaseId, approvalToken: string }` | **7. Dynamically registered only** while the active case has a pending or approved request. A clinician must approve the card first. | Enforces case binding, expiry, single use, and measurement freshness; returns a finalized report or a structured error. |
+| `finalize_report` | `{ caseId: ActiveCaseId, approvalToken: string }` (the `tok_...` value shown on the approved card — **not** the `requestId` from `request_approval`) | **7. Dynamically registered only** while the active case has a pending or approved request. A clinician must approve the card first. | Enforces case binding, expiry, single use, and measurement freshness; returns a finalized report or a structured error. |
 
 ### `set_measurements`: mutation changes what approval means
 

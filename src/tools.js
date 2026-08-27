@@ -278,8 +278,10 @@ export const TOOL_DEFINITIONS = [
   {
     name: 'finalize_report',
     description:
-      'Guarded action: finalizes and exports the clinical screening report. Requires a valid approvalToken / requestId ' +
-      'from an approval request that has been explicitly approved by a human clinician in the Approval Queue. ' +
+      'Guarded action: finalizes and exports the clinical screening report. Requires the single-use approval ' +
+      'token that is minted only when a human clinician clicks "Approve" on the request card in the Approval Queue. ' +
+      'The token is NOT the requestId returned by request_approval, and no tool can obtain it: it is displayed on ' +
+      'the approved card in the UI and must be supplied by the human operator. ' +
       'If pending, rejected, or bypassed, report finalization is blocked. Synthetic demonstration data only. ' +
       'Ordering dependency: Call request_approval, obtain human approval in the UI, then call finalize_report.',
     inputSchema: {
@@ -292,7 +294,10 @@ export const TOOL_DEFINITIONS = [
         },
         approvalToken: {
           type: 'string',
-          description: 'The unique requestId received from request_approval.',
+          description:
+            'The single-use token minted by a human clinician approving the request card in the UI ' +
+            '(format "tok_<random>_<mintedAt>"). Not the requestId from request_approval — passing that ' +
+            'returns TOKEN_NOT_FOUND. Valid for 300 seconds, for one call, for its own case only.',
         },
       },
       required: ['caseId', 'approvalToken'],
