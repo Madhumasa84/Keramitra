@@ -19,16 +19,25 @@ function parseIndexHtml() {
   const html = readFileSync(HTML_PATH, 'utf8');
   const ids = new Set();
   const i18nNodes = [];
+  const booleanAttrs = new Map(); // id -> { hidden, disabled }
   const tagRe = /<([a-zA-Z][\w-]*)((?:\s+[^>]*)?)>/g;
   let m;
   while ((m = tagRe.exec(html)) !== null) {
     const attrs = m[2] || '';
     const id = /\sid="([^"]+)"/.exec(attrs)?.[1] ?? null;
     const i18n = /\sdata-i18n="([^"]+)"/.exec(attrs)?.[1] ?? null;
-    if (id) ids.add(id);
+    if (id) {
+      ids.add(id);
+      // Reflect the boolean attributes the app reads back, so an element that
+      // ships hidden or disabled starts that way here too.
+      booleanAttrs.set(id, {
+        hidden: /\shidden(?=[\s>/=]|$)/.test(attrs),
+        disabled: /\sdisabled(?=[\s>/=]|$)/.test(attrs),
+      });
+    }
     if (i18n) i18nNodes.push({ id, key: i18n });
   }
-  return { ids: [...ids], i18nNodes };
+  return { ids: [...ids], i18nNodes, booleanAttrs };
 }
 
 function makeClassList(el) {
@@ -70,6 +79,7 @@ function createElement(tag = 'div', id = null) {
     title: '',
     type: '',
     disabled: false,
+    hidden: false,
     checked: false,
     lang: '',
     style: {},
@@ -136,9 +146,15 @@ function createElement(tag = 'div', id = null) {
  * @returns {{ byId: (id: string) => object|null, i18nKeys: string[], reset: () => void }}
  */
 export function installDom() {
-  const { ids, i18nNodes } = parseIndexHtml();
+  const { ids, i18nNodes, booleanAttrs } = parseIndexHtml();
   const registry = new Map();
-  for (const id of ids) registry.set(id, createElement('div', id));
+  for (const id of ids) {
+    const el = createElement('div', id);
+    const flags = booleanAttrs.get(id);
+    if (flags?.hidden) el.hidden = true;
+    if (flags?.disabled) el.disabled = true;
+    registry.set(id, el);
+  }
 
   // Nodes carrying data-i18n, so applyLanguage's querySelectorAll finds real targets.
   const i18nElements = i18nNodes.map(({ id, key }) => {

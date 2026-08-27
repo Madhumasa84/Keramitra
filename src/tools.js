@@ -12,6 +12,86 @@ let registeredToolHandlers = null;
 let registeredController = null;
 let toolSurfaceListener = null;
 let activeToolNames = new Set();
+
+// ── Tool-call instrumentation ────────────────────────────────────────────────
+// Every invocation is recorded, whatever transport it arrived on, so the visible
+// WebMCP Inspector can show what an agent actually did. Recording happens in a
+// finally block and never alters the value or the exception a handler produces.
+const MAX_CALL_LOG = 60;
+const toolCallLog = [];
+let toolCallSeq = 0;
+let toolCallListener = null;
+
+export function getToolCallLog() { return toolCallLog.slice(); }
+export function onToolCall(listener) { toolCallListener = listener; }
+export function clearToolCallLog() { toolCallLog.length = 0; if (toolCallListener) toolCallListener(null, toolCallLog); }
+
+function now() { return typeof performance !== 'undefined' ? performance.now() : Date.now(); }
+
+function instrument(name, handler) {
+  return async function instrumentedTool(params) {
+    const startedAt = new Date();
+    const t0 = now();
+    const entry = {
+      seq: (toolCallSeq += 1),
+      name,
+      args: params && typeof params === 'object' ? { ...params } : params,
+      time: `${startedAt.getHours().toString().padStart(2, '0')}:${startedAt.getMinutes().toString().padStart(2, '0')}:${startedAt.getSeconds().toString().padStart(2, '0')}`,
+      timestamp: startedAt.toISOString(),
+      status: 'ok',
+      result: null,
+      error: null,
+      durationMs: 0,
+    };
+    try {
+      const result = await handler(params);
+      entry.result = result;
+      entry.status = result && typeof result === 'object' && typeof result.status === 'string' ? result.status : 'ok';
+      return result;
+    } catch (err) {
+      entry.status = 'rejected';
+      entry.error = err instanceof Error ? err.message : String(err);
+      throw err;
+    } finally {
+      entry.durationMs = Math.round((now() - t0) * 100) / 100;
+      toolCallLog.unshift(entry);
+      if (toolCallLog.length > MAX_CALL_LOG) toolCallLog.length = MAX_CALL_LOG;
+      if (toolCallListener) toolCallListener(entry, toolCallLog);
+    }
+  };
+}
+
+/** Why a tool is currently in (or out of) the desired surface — for the Inspector. */
+export function describeToolAvailability(controller = registeredController) {
+  const state = controller ? controller.getState() : null;
+  const hasCase = Boolean(state?.currentCase);
+  const hasActiveApproval = Boolean(state?.approvalQueue?.some(
+    (item) => item.caseId === state.currentCase && ['PENDING', 'APPROVED'].includes(item.status)
+  ));
+  return TOOL_DEFINITIONS.map((tool) => {
+    let scope, active, reason;
+    if (ALWAYS_AVAILABLE_TOOL_NAMES.includes(tool.name)) {
+      scope = 'always'; active = true; reason = 'Always in the surface; no prerequisite.';
+    } else if (CASE_SCOPED_TOOL_NAMES.includes(tool.name)) {
+      scope = 'case'; active = hasCase;
+      reason = hasCase ? `Active because a case is loaded (${state.currentCase}).` : 'Needs an active case.';
+    } else {
+      scope = 'gated'; active = hasActiveApproval;
+      reason = hasActiveApproval
+        ? 'Active because this case has a PENDING or APPROVED approval request.'
+        : 'Withheld until a human approval request exists for the active case.';
+    }
+    return {
+      name: tool.name,
+      scope,
+      active,
+      reason,
+      registeredWithHost: registeredToolNames.includes(tool.name),
+      inputSchema: tool.inputSchema,
+      description: tool.description,
+    };
+  });
+}
 const ALWAYS_AVAILABLE_TOOL_NAMES = ['list_cases', 'load_case', 'generate_case'];
 const CASE_SCOPED_TOOL_NAMES = ['analyze_rings', 'get_measurements', 'set_measurements', 'evaluate_referral', 'explain_evidence', 'request_approval'];
 const PRESET_CASE_IDS = ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'];
@@ -476,8 +556,12 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     },
   };
 
+  const instrumentedHandlers = Object.fromEntries(
+    Object.entries(toolHandlers).map(([name, fn]) => [name, instrument(name, fn)])
+  );
+
   registeredController = controller;
-  registeredToolHandlers = toolHandlers;
+  registeredToolHandlers = instrumentedHandlers;
   toolSurfaceListener = onSurfaceChange;
   const registrationResult = syncWebMCPToolSurface(controller);
 
@@ -486,15 +570,17 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     window.keramitraTools = {
       listTools: () => TOOL_DEFINITIONS.filter((tool) => activeToolNames.has(tool.name)),
       invokeTool: async (name, args = {}) => {
-        const handler = toolHandlers[name];
+        const handler = instrumentedHandlers[name];
         if (!handler || !activeToolNames.has(name)) throw new Error(`Inactive or unknown WebMCP tool: ${name}`);
         return await handler(args);
       },
       hasNativeModelContext: Boolean(getModelContext()),
+      getCallLog: () => getToolCallLog(),
+      describeSurface: () => describeToolAvailability(),
     };
   }
 
-  return { ...registrationResult, handlers: toolHandlers };
+  return { ...registrationResult, handlers: instrumentedHandlers };
 }
 
 /**

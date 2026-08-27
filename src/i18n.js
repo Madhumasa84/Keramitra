@@ -25,6 +25,22 @@ export const STRINGS = {
     badgeNoHostTitle: 'No document.modelContext or navigator.modelContext. Nothing is registered with a host; window.keramitraTools remains callable from the console.',
     badgeNativeTitle: 'Native WebMCP (document.modelContext) active and connected.',
 
+    // WebMCP Inspector
+    inspectorTitle: 'WebMCP Inspector',
+    inspectorSubtitle: 'Live model-context surface and call log',
+    inspectorSurfaceHeading: 'Live tool surface',
+    inspectorSurfaceNote: 'The surface is a function of application state. Tools appear and disappear as the view changes; click any row for its JSON Schema.',
+    inspectorLogHeading: 'Tool call log',
+    inspectorLogNote: 'Every invocation, whichever transport it arrived on, with arguments and outcome.',
+    inspectorClearLog: 'Clear',
+    inspectorEmptyLog: 'No tool calls yet. Run one from an agent, or from the console with window.keramitraTools.invokeTool(...).',
+    inspectorScopeAlways: 'always',
+    inspectorScopeCase: 'case-scoped',
+    inspectorScopeGated: 'approval-gated',
+    inspectorWithheld: 'withheld',
+    inspectorHostNative: 'Registered on document.modelContext — discoverable by an agent.',
+    inspectorHostNone: 'No WebMCP host. Nothing is registered; these are reachable only from the console.',
+
     // Panels & Headers
     caseViewerTitle: 'Case viewer',
     evidenceTitle: 'Evidence',
@@ -154,6 +170,22 @@ export const STRINGS = {
     badgeNoHost: 'WebMCP ஹோஸ்ட் இல்லை — கன்சோல் மட்டும்',
     badgeNoHostTitle: 'document.modelContext / navigator.modelContext இல்லை. எந்தக் கருவியும் ஹோஸ்டில் பதிவு செய்யப்படவில்லை; window.keramitraTools கன்சோலில் இயங்கும்.',
     badgeNativeTitle: 'நேட்டிவ் WebMCP (document.modelContext) இயங்குகிறது.',
+
+    // WebMCP Inspector
+    inspectorTitle: 'WebMCP ஆய்வுக் கருவி',
+    inspectorSubtitle: 'நேரலை மாடல்-கான்டெக்ஸ்ட் பட்டியல் மற்றும் அழைப்புப் பதிவு',
+    inspectorSurfaceHeading: 'நேரலை கருவிப் பட்டியல்',
+    inspectorSurfaceNote: 'கருவிப் பட்டியல் செயலியின் நிலையைப் பொறுத்தது. காட்சி மாறும்போது கருவிகள் தோன்றும், மறையும்; JSON Schema-வைப் பார்க்க வரிசையைத் தொடவும்.',
+    inspectorLogHeading: 'கருவி அழைப்புப் பதிவு',
+    inspectorLogNote: 'எந்த வழியில் வந்தாலும் ஒவ்வொரு அழைப்பும், அதன் உள்ளீடுகள் மற்றும் முடிவுடன்.',
+    inspectorClearLog: 'அழி',
+    inspectorEmptyLog: 'இதுவரை கருவி அழைப்பு இல்லை. ஏஜென்ட் மூலமாகவோ அல்லது கன்சோலில் window.keramitraTools.invokeTool(...) மூலமாகவோ இயக்கவும்.',
+    inspectorScopeAlways: 'எப்போதும்',
+    inspectorScopeCase: 'மாதிரி சார்ந்தது',
+    inspectorScopeGated: 'ஒப்புதல் தேவை',
+    inspectorWithheld: 'கிடைக்கவில்லை',
+    inspectorHostNative: 'document.modelContext-இல் பதிவு செய்யப்பட்டுள்ளது — ஏஜென்ட் கண்டறியும்.',
+    inspectorHostNone: 'WebMCP ஹோஸ்ட் இல்லை. எதுவும் பதிவு செய்யப்படவில்லை; கன்சோலில் மட்டுமே அணுகலாம்.',
 
     // Panels & Headers
     caseViewerTitle: 'கண் பார்வை படம்',

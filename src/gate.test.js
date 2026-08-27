@@ -179,6 +179,38 @@ check('Verdict token stays an English identifier', dom.byId('verdict-text').text
 appController.setLanguage('en');
 check('Switching back restores English', dom.byId('heading-case-viewer').textContent === 'Case viewer');
 
+// ── 9. WebMCP Inspector ───────────────────────────────────────────────────────
+console.log('\n[9] WebMCP Inspector mirrors the live surface and the call log\n');
+
+const inspector = dom.byId('webmcp-inspector');
+const badge = dom.byId('webmcp-badge');
+check('Inspector ships hidden in index.html', inspector.hidden === true);
+badge.click();
+check('Clicking the header badge opens it', inspector.hidden === false);
+
+const toolRows = () => dom.within('inspector-tool-list').filter((n) => n.classList.contains('inspector-tool'));
+check('Every declared tool gets a row', toolRows().length === 10, `${toolRows().length} rows`);
+
+appController.loadCase('CASE_B');
+check('Surface count reflects 9 of 10 with no approval request', dom.byId('inspector-surface-count').textContent === '9 / 10', dom.byId('inspector-surface-count').textContent);
+check('finalize_report is shown withheld before approval', toolRows().filter((r) => r.classList.contains('is-withheld')).length === 1);
+
+appController.queueReferralRequest({ caseId: 'CASE_B', proposedAction: 'Refer' });
+check('Queueing an approval widens the surface to 10 of 10', dom.byId('inspector-surface-count').textContent === '10 / 10', dom.byId('inspector-surface-count').textContent);
+check('No tool is withheld once finalize_report is relevant', toolRows().filter((r) => r.classList.contains('is-withheld')).length === 0);
+
+const callRows = () => dom.within('inspector-call-log').filter((n) => n.classList.contains('inspector-call'));
+const beforeCalls = callRows().length;
+await tools.invokeTool('get_measurements', { caseId: 'CASE_B' });
+check('A successful call is logged', callRows().length === beforeCalls + 1);
+try { await tools.invokeTool('load_case', { caseId: 'NOPE' }); } catch { /* expected */ }
+check('A rejected call is logged and marked blocked', callRows()[0].classList.contains('is-blocked'));
+check('Rejection did not corrupt the surface', dom.byId('inspector-surface-count').textContent === '10 / 10');
+
+const logged = tools.getCallLog();
+check('Call log records tool, args, status and duration', Boolean(logged[0].name && logged[0].status && typeof logged[0].durationMs === 'number' && logged[0].args));
+check('Instrumentation preserves rejection: the error is still thrown', logged[0].status === 'rejected' && Boolean(logged[0].error));
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + SEP);
 if (failures === 0) {

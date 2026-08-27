@@ -207,6 +207,25 @@ On native hosts, each synchronization uses `registerTool` for newly relevant too
 
 This is a browser-native WebMCP capability: the page can expose precisely the actions meaningful in its current view, rather than publishing one fixed server-side MCP tool list for every state.
 
+### Seeing it without an agent: the WebMCP Inspector
+
+The dynamic surface is the most interesting thing this page does and the hardest to
+demonstrate, because it is invisible unless you have an agent host attached. Click the
+**WebMCP** badge in the header to open the Inspector, a slide-over panel that mirrors it:
+
+- **Live tool surface** — all ten tools, each marked `always` / `case-scoped` /
+  `approval-gated`, with a lit dot for the ones currently in the surface and a plain
+  sentence explaining why each is in or out. Click any row for its verbatim JSON Schema.
+  Load a case and the six case-scoped tools light up; queue an approval and
+  `finalize_report` appears; reject it and the tool disappears again.
+- **Tool call log** — every invocation, whichever transport it arrived on, with arguments,
+  outcome, structured error code and duration in milliseconds. Blocked and rejected calls
+  are marked. This is where a `TOKEN_MISSING` or a `caseId` rejection shows up immediately.
+
+Instrumentation wraps each handler once, so the native `execute`, `window.keramitraTools`
+and the handler map are still the same function object; it records in a `finally` block and
+never alters a return value or swallows an exception.
+
 ---
 
 ## The Approval Gate (Human-in-the-Loop Security Enforcement)

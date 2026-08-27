@@ -1234,3 +1234,268 @@ html, body {
     animation: none !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   WebMCP Inspector — slide-over panel opened from the header badge.
+   Mirrors the dynamic tool surface and the live call log so the agent-facing
+   behaviour is inspectable without an agent host.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.webmcp-badge {
+  cursor: pointer;
+  border: 1px solid transparent;
+  font: inherit;
+}
+
+.webmcp-badge:hover {
+  border-color: var(--border-strong);
+}
+
+.webmcp-badge:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.inspector {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 100vw);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.45);
+}
+
+.inspector[hidden] {
+  display: none;
+}
+
+.inspector-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-hairline);
+  background: var(--bg-subtle);
+}
+
+.inspector-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.inspector-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+.inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.inspector-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.inspector-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-action);
+}
+
+.inspector-note {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
+
+.inspector-tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.inspector-tool {
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-input);
+}
+
+.inspector-tool.is-withheld {
+  opacity: 0.55;
+}
+
+.inspector-tool-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary);
+}
+
+.inspector-tool-head:hover {
+  background: var(--bg-hover);
+}
+
+.inspector-tool-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.inspector-tool.is-active .inspector-tool-dot {
+  background: var(--verdict-routine-text);
+  box-shadow: 0 0 6px rgba(82, 196, 106, 0.7);
+}
+
+.inspector-tool-name {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.inspector-tool-scope,
+.inspector-tool-state {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  flex: none;
+}
+
+.inspector-tool-detail {
+  padding: 0 9px 9px;
+  border-top: 1px dashed var(--border-hairline);
+}
+
+.inspector-tool-why {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 8px 0;
+}
+
+.inspector-schema {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  background: var(--bg-app);
+  border: 1px solid var(--border-hairline);
+  padding: 8px;
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre;
+}
+
+.inspector-call-log {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inspector-call {
+  border: 1px solid var(--border-hairline);
+  border-left: 3px solid var(--border-strong);
+  background: var(--bg-input);
+  padding: 6px 8px;
+}
+
+.inspector-call.is-blocked {
+  border-left-color: var(--verdict-refer-text);
+}
+
+.inspector-call-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.inspector-call-time,
+.inspector-call-ms {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-dim);
+}
+
+.inspector-call-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.inspector-call-status {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+}
+
+.inspector-call-status.status-blocked,
+.inspector-call-status.status-rejected {
+  color: var(--verdict-refer-text);
+  border-color: var(--verdict-refer-border);
+  background: var(--verdict-refer-bg);
+}
+
+.inspector-call-status.status-finalized,
+.inspector-call-status.status-ok {
+  color: var(--verdict-routine-text);
+  border-color: var(--verdict-routine-border);
+  background: var(--verdict-routine-bg);
+}
+
+.inspector-call-args {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .inspector {
+    width: 100vw;
+    border-left: none;
+  }
+}

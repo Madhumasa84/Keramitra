@@ -21,7 +21,7 @@
         <span class="meta-item"><span class="meta-label" data-i18n="modeLabel">Mode</span> <span data-i18n="modeVal">MANUAL_SCREENING</span></span>
         <span class="meta-item" id="webmcp-item">
           <span class="meta-label" data-i18n="webmcpLabel">WebMCP</span>
-          <span class="webmcp-badge" id="webmcp-badge" title="WebMCP Model Context API Status">INITIALIZING</span>
+          <button type="button" class="webmcp-badge" id="webmcp-badge" title="WebMCP Model Context API Status" aria-expanded="false" aria-controls="webmcp-inspector">INITIALIZING</button>
         </span>
         <div class="lang-selector-group" role="group" aria-label="Language selection">
           <button type="button" class="btn btn-lang active" data-lang="en" id="btn-lang-en">EN</button>
@@ -33,6 +33,36 @@
     <div class="shim-announcement-bar" id="shim-announcement-bar" style="display: none;" role="alert" data-i18n="noHostBanner">
       No WebMCP host detected — neither document.modelContext nor navigator.modelContext is present, so no tools are registered and no agent can discover them. The tools below are still callable by hand from the DevTools console via window.keramitraTools. Enable the WebMCP preview flag in Chrome Canary/Dev for native execution.
     </div>
+
+    <aside class="inspector" id="webmcp-inspector" hidden aria-labelledby="inspector-title">
+      <div class="inspector-header">
+        <div>
+          <h2 class="inspector-title" id="inspector-title" data-i18n="inspectorTitle">WebMCP Inspector</h2>
+          <p class="inspector-sub" id="inspector-host" data-i18n="inspectorSubtitle">Live model-context surface and call log</p>
+        </div>
+        <button type="button" class="btn btn-subtle-sm" id="inspector-close" aria-label="Close inspector">✕</button>
+      </div>
+
+      <div class="inspector-body">
+        <section class="inspector-section">
+          <div class="inspector-section-head">
+            <span class="control-label" data-i18n="inspectorSurfaceHeading">Live tool surface</span>
+            <span class="inspector-count" id="inspector-surface-count">--</span>
+          </div>
+          <p class="inspector-note" data-i18n="inspectorSurfaceNote">The surface is a function of application state. Tools appear and disappear as the view changes; click any row for its JSON Schema.</p>
+          <div class="inspector-tool-list" id="inspector-tool-list" role="list"></div>
+        </section>
+
+        <section class="inspector-section">
+          <div class="inspector-section-head">
+            <span class="control-label" data-i18n="inspectorLogHeading">Tool call log</span>
+            <button type="button" class="btn btn-subtle-sm" id="inspector-clear-log" data-i18n="inspectorClearLog">Clear</button>
+          </div>
+          <p class="inspector-note" data-i18n="inspectorLogNote">Every invocation, whichever transport it arrived on, with arguments and outcome.</p>
+          <div class="inspector-call-log" id="inspector-call-log" role="log" aria-live="polite"></div>
+        </section>
+      </div>
+    </aside>
 
     <main class="app-layout">
       <!-- LEFT COLUMN: Case Viewer -->
