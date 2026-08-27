@@ -109,16 +109,17 @@ export const STRINGS = {
     btnRejectReferral: 'Reject referral',
     btnRejectRepeat: 'Reject repeat scan',
     statusApproved: 'Approved',
+    statusStaleMeasurements: 'Approval stale — measurements changed; submit a new request.',
     statusRejected: 'Rejected',
     tokenLabel: 'Single-use token (valid 5 min)',
 
     // Security Gate & Demo
     guardSectionTitle: 'Security gate demonstration',
     btnDemoUnapprovedFinalize: 'Demo: unapproved finalize attempt',
-    btnDemoCaseDInjection: 'Demo: prompt-injection bypass attempt',
+    btnDemoCaseDInjection: 'Simulated bypass attempt (deterministic)',
     tokenMissingTitle: 'TOKEN_MISSING',
     tokenMissingMsg: 'Blocked: Approval token required to finalize report. Request human approval first.',
-    tokenMissingAdversarialMsg: 'Blocked: Prompt injection override rejected. Offline clinician notes in metadata cannot bypass the structural in-memory approval gate.',
+    tokenMissingAdversarialMsg: 'Blocked: no approval token. Case metadata cannot mint tokens — only a human DOM interaction can.',
 
     // Audit Trail
     auditTitle: 'Audit trail',
@@ -227,16 +228,17 @@ export const STRINGS = {
     btnRejectReferral: 'பரிந்துரையை நிராகரி',
     btnRejectRepeat: 'மறுபடத்தை நிராகரி',
     statusApproved: 'ஒப்புதல் அளிக்கப்பட்டது',
+    statusStaleMeasurements: 'அளவீடுகள் மாறிவிட்டன — புதிய ஒப்புதல் கோரிக்கையைச் சமர்ப்பிக்கவும்.',
     statusRejected: 'நிராகரிக்கப்பட்டது',
     tokenLabel: 'ஒருமுறை பயன்பாட்டு டோக்கன் (5 நிமிடம் மட்டும்)',
 
     // Security Gate & Demo
     guardSectionTitle: 'பாதுகாப்பு சோதனை',
     btnDemoUnapprovedFinalize: 'ஒப்புதலின்றி முடிக்க முயற்சி செய் (Demo)',
-    btnDemoCaseDInjection: 'மாதிரி D ஊடுருவல் சோதனை (Injection Demo)',
+    btnDemoCaseDInjection: 'உருவகப்படுத்தப்பட்ட தவிர்ப்பு முயற்சி (நிர்ணயிக்கப்பட்டது)',
     tokenMissingTitle: 'TOKEN_MISSING (டோக்கன் இல்லை)',
     tokenMissingMsg: 'தடைசெய்யப்பட்டது: மருத்துவர் ஒப்புதல் டோக்கன் இல்லாமல் அறிக்கையை முடிக்க முடியாது.',
-    tokenMissingAdversarialMsg: 'தடைசெய்யப்பட்டது: ஆபரேட்டர் குறிப்பு மூலம் மனித ஒப்புதலை தவிர்க்க முடியாது. மருத்துவரின் நேரடி ஒப்புதல் அவசியம்.',
+    tokenMissingAdversarialMsg: 'தடைசெய்யப்பட்டது: ஒப்புதல் டோக்கன் இல்லை. Case metadata டோக்கனை உருவாக்க முடியாது — மனிதர் DOM-இல் செய்யும் செயலால் மட்டுமே அது உருவாகும்.',
 
     // Audit Trail
     auditTitle: 'செயல்பாட்டு பதிவு (Audit Trail)',

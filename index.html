@@ -31,7 +31,7 @@
     </header>
 
     <div class="shim-announcement-bar" id="shim-announcement-bar" style="display: none;" role="alert">
-      Running on compatibility shim — native WebMCP (document.modelContext) not detected. Enable Chrome 146+ preview flags for native execution.
+      Running on compatibility shim — native WebMCP (document.modelContext) not detected. Enable Chrome 149+ preview flags for native execution.
     </div>
 
     <main class="app-layout">
@@ -52,6 +52,13 @@
             <button type="button" class="btn btn-case" data-case="CASE_C" id="btn-case-c" data-i18n="caseC">Case C</button>
             <button type="button" class="btn btn-case btn-case-d" data-case="CASE_D" id="btn-case-d" data-i18n="caseD">Case D (Security demo)</button>
           </div>
+        </div>
+
+        <div class="generator-controls" aria-label="Parametric synthetic case generator">
+          <div class="generator-label-row"><span class="control-label">Generated case</span><output id="slider-seed">Seed: random</output></div>
+          <label for="slider-steepening">Inferior steepening <output id="slider-steepening-value">0.50</output></label>
+          <input type="range" id="slider-steepening" min="0" max="1" step="0.05" value="0.50" />
+          <p class="generator-note">Drag to regenerate a seeded synthetic capture through the same pixel analysis pipeline.</p>
         </div>
 
         <div class="eye-selector-bar">
@@ -180,7 +187,7 @@
                 <tr id="metric-row-K1">
                   <td class="metric-name"><label for="input-k1" data-i18n="paramK1">K1 (Flat meridian)</label></td>
                   <td class="num-col">
-                    <input type="number" step="0.1" id="input-k1" class="num-input" value="43.2" />
+                    <input type="number" step="0.1" min="30" max="60" id="input-k1" class="num-input" value="43.2" />
                   </td>
                   <td class="unit-cell">D</td>
                   <td class="ref-cell">40.0 – 46.0</td>
@@ -188,7 +195,7 @@
                 <tr id="metric-row-K2" class="traceable-row" data-metric="K2">
                   <td class="metric-name"><label for="input-k2" data-i18n="paramK2">K2 (Steep meridian)</label></td>
                   <td class="num-col">
-                    <input type="number" step="0.1" id="input-k2" class="num-input" value="43.8" />
+                    <input type="number" step="0.1" min="30" max="60" id="input-k2" class="num-input" value="43.8" />
                   </td>
                   <td class="unit-cell">D</td>
                   <td class="ref-cell">&le; 47.0</td>
@@ -204,7 +211,7 @@
                 <tr id="metric-row-pachymetry" class="traceable-row" data-metric="pachymetry">
                   <td class="metric-name"><label for="input-pachy" data-i18n="paramPachy">Central corneal thickness</label></td>
                   <td class="num-col">
-                    <input type="number" step="1" id="input-pachy" class="num-input" value="548" />
+                    <input type="number" step="1" min="300" max="700" id="input-pachy" class="num-input" value="548" />
                   </td>
                   <td class="unit-cell">&mu;m</td>
                   <td class="ref-cell">&ge; 470</td>
@@ -212,7 +219,7 @@
                 <tr id="metric-row-cylinder" class="traceable-row" data-metric="cylinder">
                   <td class="metric-name"><label for="input-cyl" data-i18n="paramCyl">Cylinder magnitude</label></td>
                   <td class="num-col">
-                    <input type="number" step="0.05" id="input-cyl" class="num-input" value="0.60" />
+                    <input type="number" step="0.05" min="0" max="10" id="input-cyl" class="num-input" value="0.60" />
                   </td>
                   <td class="unit-cell">D</td>
                   <td class="ref-cell">&le; 1.50</td>
@@ -271,7 +278,7 @@
                 Demo: attempt unapproved finalize
               </button>
               <button type="button" class="btn btn-demo-guard btn-demo-injection" id="btn-demo-case-d-injection" data-i18n="btnDemoCaseDInjection">
-                Demo: prompt-injection bypass attempt
+                Simulated bypass attempt (deterministic)
               </button>
             </div>
             <div class="guard-alert-box" id="guard-alert-box" style="display: none;" role="alert">

@@ -8,9 +8,55 @@ import { CASES, CASE_METADATA } from './synth.js';
 import { generateEvidenceExplanation } from './i18n.js';
 
 let registeredToolNames = [];
+let registeredToolHandlers = null;
+let registeredController = null;
+let toolSurfaceListener = null;
+let activeToolNames = new Set();
+const ALWAYS_AVAILABLE_TOOL_NAMES = ['list_cases', 'load_case', 'generate_case'];
+const CASE_SCOPED_TOOL_NAMES = ['analyze_rings', 'get_measurements', 'set_measurements', 'evaluate_referral', 'explain_evidence', 'request_approval'];
+function getModelContext() {
+  return typeof document !== 'undefined' ? (document.modelContext ?? (typeof navigator !== 'undefined' ? navigator.modelContext : null)) : null;
+}
+function getDesiredToolNames(controller) {
+  const appState = controller.getState();
+  const desired = new Set(ALWAYS_AVAILABLE_TOOL_NAMES);
+  if (appState.currentCase) {
+    CASE_SCOPED_TOOL_NAMES.forEach((name) => desired.add(name));
+    const hasActiveApproval = appState.approvalQueue.some((item) => item.caseId === appState.currentCase && ['PENDING', 'APPROVED'].includes(item.status));
+    if (hasActiveApproval) desired.add('finalize_report');
+  }
+  return desired;
+}
+export function syncWebMCPToolSurface(controller = registeredController) {
+  if (!controller || !registeredToolHandlers) return { modelContextAvailable: false, toolsCount: 0, activeToolNames: [] };
+  const desired = getDesiredToolNames(controller);
+  const modelContext = getModelContext();
+  if (modelContext && typeof modelContext.registerTool === 'function') {
+    const registered = new Set(registeredToolNames);
+    registered.forEach((name) => {
+      if (!desired.has(name) && typeof modelContext.unregisterTool === 'function') {
+        try { modelContext.unregisterTool(name); } catch (err) { console.warn(`WebMCP unregistration for ${name} encountered:`, err); }
+        registered.delete(name);
+      }
+    });
+    desired.forEach((name) => {
+      if (registered.has(name)) return;
+      const toolDef = TOOL_DEFINITIONS.find((tool) => tool.name === name);
+      try {
+        modelContext.registerTool({ name, description: toolDef.description, inputSchema: toolDef.inputSchema, execute: registeredToolHandlers[name] });
+        registered.add(name);
+      } catch (err) { console.warn(`WebMCP registration for ${name} encountered:`, err); }
+    });
+    registeredToolNames = [...registered];
+  }
+  activeToolNames = desired;
+  const result = { modelContextAvailable: Boolean(modelContext), toolsCount: desired.size, activeToolNames: [...desired] };
+  if (toolSurfaceListener) toolSurfaceListener(result);
+  return result;
+}
 
 /**
- * Full JSON Schema definitions and metadata for all 8 WebMCP tools.
+ * Full JSON Schema definitions and metadata for all 10 WebMCP tools.
  */
 export const TOOL_DEFINITIONS = [
   {
@@ -58,7 +104,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
+          pattern: '^(CASE_[ABCD]|GEN_[1-9][0-9]*)$',
           description: 'Optional case ID. If provided, ensures the case is loaded before analyzing.',
         },
       },
@@ -76,9 +122,58 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
+          pattern: '^(CASE_[ABCD]|GEN_[1-9][0-9]*)$',
           description: 'Optional case ID. If provided, retrieves measurements associated with that case.',
         },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'set_measurements',
+    description:
+      'Updates one or more biometric corneal measurements for a synthetic case. Accepts partial updates and ' +
+      'validates each supplied value: K1/K2 30–60 D, axis 0–180°, pachymetry 300–700 µm, cylinder 0–10 D. ' +
+      'On success, visibly updates the biometric table, re-runs the referral rule engine, and refreshes the verdict ' +
+      'and reason chips. Any unused human approval token for that case becomes stale because it no longer represents ' +
+      'the measurements being finalized. Ordering dependency: Call load_case first or provide caseId.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caseId: {
+          type: 'string',
+          pattern: '^(CASE_[ABCD]|GEN_[1-9][0-9]*)$',
+          description: 'The synthetic case whose active measurements will be updated.',
+        },
+        K1: { type: 'number', minimum: 30, maximum: 60, description: 'Flat keratometry in dioptres (30–60 D).' },
+        K2: { type: 'number', minimum: 30, maximum: 60, description: 'Steep keratometry in dioptres (30–60 D).' },
+        axis: { type: 'number', minimum: 0, maximum: 180, description: 'Astigmatism axis in degrees (0–180).' },
+        pachymetry: { type: 'number', minimum: 300, maximum: 700, description: 'Central corneal thickness in µm (300–700).' },
+        cylinder: { type: 'number', minimum: 0, maximum: 10, description: 'Cylinder magnitude in dioptres (0–10 D).' },
+      },
+      required: ['caseId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'generate_case',
+    description:
+      'Builds and renders a seeded parametric synthetic Placido case through the existing synth.js, analyze.js, and rules.js pipeline. ' +
+      'All parameters are optional; response always includes the seed and GEN_<seed> ID for reproducibility. ' +
+      'This tool only creates visible case state and cannot mint, modify, or bypass human approval tokens.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        seed: { type: 'integer', minimum: 1, maximum: 2147483646 },
+        steepening: { type: 'number', minimum: 0, maximum: 1 },
+        glare: { type: 'number', minimum: 0, maximum: 1 },
+        occlusion: { type: 'number', minimum: 0, maximum: 1 },
+        ringCount: { type: 'integer', minimum: 8, maximum: 18 },
+        K1: { type: 'number', minimum: 30, maximum: 60 },
+        K2: { type: 'number', minimum: 30, maximum: 60 },
+        axis: { type: 'number', minimum: 0, maximum: 180 },
+        pachymetry: { type: 'number', minimum: 300, maximum: 700 },
+        cylinder: { type: 'number', minimum: 0, maximum: 10 },
       },
       additionalProperties: false,
     },
@@ -95,7 +190,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
+          pattern: '^(CASE_[ABCD]|GEN_[1-9][0-9]*)$',
           description: 'Optional case ID to evaluate.',
         },
       },
@@ -113,7 +208,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
+          pattern: '^(CASE_[ABCD]|GEN_[1-9][0-9]*)$',
           description: 'Identifier of the case to explain.',
         },
         language: {
@@ -138,7 +233,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
+          pattern: '^(CASE_[ABCD]|GEN_[1-9][0-9]*)$',
           description: 'The case ID submitted for approval.',
         },
         proposedAction: {
@@ -162,7 +257,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         caseId: {
           type: 'string',
-          enum: ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'],
+          pattern: '^(CASE_[ABCD]|GEN_[1-9][0-9]*)$',
           description: 'The case ID to finalize.',
         },
         approvalToken: {
@@ -180,12 +275,7 @@ export const TOOL_DEFINITIONS = [
  * Register WebMCP tools with the browser model context and local controller.
  * @param {object} controller - App controller instance from main.js
  */
-export function registerWebMCPTools(controller) {
-  // Spec moved the getter Navigator → Document (May 2026 draft).
-  // navigator.modelContext remains a deprecated alias; support both.
-  const modelContext = typeof document !== 'undefined'
-    ? (document.modelContext ?? (typeof navigator !== 'undefined' ? navigator.modelContext : null))
-    : null;
+export function registerWebMCPTools(controller, onSurfaceChange = null) {
 
   // Tool implementation mapping calling existing UI controller methods
   const toolHandlers = {
@@ -268,6 +358,17 @@ export function registerWebMCPTools(controller) {
       };
     },
 
+    set_measurements: async (params) => {
+      const { caseId, K1, K2, axis, pachymetry, cylinder } = params || {};
+      const updates = Object.fromEntries(
+        Object.entries({ K1, K2, axis, pachymetry, cylinder })
+          .filter(([, value]) => value !== undefined)
+      );
+      return controller.setMeasurements({ caseId, updates, actor: 'AGENT' });
+    },
+    generate_case: async (params) => {
+      return controller.generateCase(params || {}, 'AGENT');
+    },
     evaluate_referral: async (params) => {
       if (params?.caseId && params.caseId !== controller.getState().currentCase) {
         controller.loadCase(params.caseId);
@@ -325,42 +426,25 @@ export function registerWebMCPTools(controller) {
     },
   };
 
-  // Register in native WebMCP modelContext if supported
-  if (modelContext && typeof modelContext.registerTool === 'function') {
-    TOOL_DEFINITIONS.forEach((toolDef) => {
-      try {
-        modelContext.registerTool({
-          name: toolDef.name,
-          description: toolDef.description,
-          inputSchema: toolDef.inputSchema,
-          execute: toolHandlers[toolDef.name],
-        });
-        registeredToolNames.push(toolDef.name);
-      } catch (err) {
-        console.warn(`WebMCP registration for ${toolDef.name} encountered:`, err);
-      }
-    });
-    console.info(`[WebMCP] Successfully registered ${registeredToolNames.length} tools on document.modelContext`);
-  }
+  registeredController = controller;
+  registeredToolHandlers = toolHandlers;
+  toolSurfaceListener = onSurfaceChange;
+  const registrationResult = syncWebMCPToolSurface(controller);
 
   // Expose global test interface
   if (typeof window !== 'undefined') {
     window.keramitraTools = {
-      listTools: () => TOOL_DEFINITIONS,
+      listTools: () => TOOL_DEFINITIONS.filter((tool) => activeToolNames.has(tool.name)),
       invokeTool: async (name, args = {}) => {
         const handler = toolHandlers[name];
-        if (!handler) throw new Error(`Unknown WebMCP tool: ${name}`);
+        if (!handler || !activeToolNames.has(name)) throw new Error(`Inactive or unknown WebMCP tool: ${name}`);
         return await handler(args);
       },
-      hasNativeModelContext: Boolean(modelContext),
+      hasNativeModelContext: Boolean(getModelContext()),
     };
   }
 
-  return {
-    modelContextAvailable: Boolean(modelContext),
-    toolsCount: TOOL_DEFINITIONS.length,
-    handlers: toolHandlers,
-  };
+  return { ...registrationResult, handlers: toolHandlers };
 }
 
 /**
@@ -381,4 +465,8 @@ export function unregisterWebMCPTools() {
     });
   }
   registeredToolNames = [];
+  activeToolNames = new Set();
+  registeredToolHandlers = null;
+  registeredController = null;
+  toolSurfaceListener = null;
 }

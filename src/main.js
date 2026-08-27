@@ -4,10 +4,10 @@
  * structurally enforced approval gate, audit trail, and full Tamil (ta) / English (en) i18n.
  */
 
-import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS, CASE_METADATA } from './synth.js';
+import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS, CASE_METADATA, GENERATED_CASE_RANGES, createGeneratedCase } from './synth.js';
 import { analyzeRings } from './analyze.js';
 import { evaluateReferral, THRESHOLDS, REASON_CODES, VERDICTS } from './rules.js';
-import { registerWebMCPTools, unregisterWebMCPTools } from './tools.js';
+import { registerWebMCPTools, unregisterWebMCPTools, syncWebMCPToolSurface } from './tools.js';
 import { STRINGS, t, generateEvidenceExplanation } from './i18n.js';
 
 // Structured Guard Error Codes (Exhaustive)
@@ -18,10 +18,25 @@ export const GUARD_ERRORS = {
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   APPROVAL_REJECTED: 'APPROVAL_REJECTED',
   TOKEN_NOT_FOUND: 'TOKEN_NOT_FOUND',
+  TOKEN_STALE_MEASUREMENTS: 'TOKEN_STALE_MEASUREMENTS',
 };
 
 // In-Memory Token Registry (Single-use, ephemeral, bound to requestId + caseId)
 const tokenRegistry = new Map();
+export const MEASUREMENT_RANGES = {
+  K1: { min: 30, max: 60, unit: 'D' },
+  K2: { min: 30, max: 60, unit: 'D' },
+  axis: { min: 0, max: 180, unit: '°' },
+  pachymetry: { min: 300, max: 700, unit: 'µm' },
+  cylinder: { min: 0, max: 10, unit: 'D' },
+};
+const measurementInputElements = {
+  K1: 'inputK1',
+  K2: 'inputK2',
+  axis: 'inputAxis',
+  pachymetry: 'inputPachy',
+  cylinder: 'inputCyl',
+};
 
 // Application State
 const state = {
@@ -35,6 +50,7 @@ const state = {
   referralResult: null,
   approvalQueue: [],
   auditTrail: [],
+  generatedCase: null,
 };
 
 // DOM Element References
@@ -52,6 +68,9 @@ const elements = {
   btnAnalyze: document.getElementById('btn-analyze'),
   btnToggleOverlay: document.getElementById('btn-toggle-overlay'),
   qualityChip: document.getElementById('quality-chip'),
+  sliderSteepening: document.getElementById('slider-steepening'),
+  sliderSteepeningValue: document.getElementById('slider-steepening-value'),
+  sliderSeed: document.getElementById('slider-seed'),
   usableMeridiansVal: document.getElementById('usable-meridians-val'),
   operatorNoteRow: document.getElementById('operator-note-row'),
   adversarialBadge: document.getElementById('adversarial-badge'),
@@ -319,17 +338,88 @@ function setSourceHighlight(rowIds, highlight) {
   });
 }
 
-/**
- * Read numerical measurements from input fields.
- */
-function readMeasurementsFromInputs() {
-  return {
-    K1: parseFloat(elements.inputK1.value) || 0,
-    K2: parseFloat(elements.inputK2.value) || 0,
-    axis: parseFloat(elements.inputAxis.value) || 0,
-    pachymetry: parseFloat(elements.inputPachy.value) || 0,
-    cylinder: parseFloat(elements.inputCyl.value) || 0,
+function writeMeasurementInputs(measurements) {
+  Object.entries(measurements).forEach(([field, value]) => {
+    const element = elements[measurementInputElements[field]];
+    if (element) {
+      element.value = field === 'K1' || field === 'K2' ? value.toFixed(1) : field === 'cylinder' ? value.toFixed(2) : value;
+      element.setCustomValidity('');
+    }
+  });
+}
+function validateMeasurementUpdates(updates) {
+  const entries = Object.entries(updates || {});
+  if (entries.length === 0) return { valid: false, error: { status: 'error', error: 'NO_MEASUREMENTS_PROVIDED', message: 'Provide at least one biometric measurement to update.' } };
+  for (const [field, value] of entries) {
+    const range = MEASUREMENT_RANGES[field];
+    if (!range) {
+      return { valid: false, error: { status: 'error', error: 'UNKNOWN_MEASUREMENT_FIELD', field, message: `Unknown biometric field '${field}'.` } };
+    }
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return { valid: false, error: { status: 'error', error: 'MEASUREMENT_INVALID', field, acceptedRange: range, received: value, message: `${field} must be a finite number between ${range.min} and ${range.max} ${range.unit}.` } };
+    }
+    if (value < range.min || value > range.max) {
+      return { valid: false, error: { status: 'error', error: 'MEASUREMENT_OUT_OF_RANGE', field, acceptedRange: range, received: value, message: `${field} must be between ${range.min} and ${range.max} ${range.unit}.` } };
+    }
+  }
+  return { valid: true };
+}
+function invalidateApprovalTokensForMeasurements(caseId, actor, changedFields) {
+  const staleAt = new Date().toISOString();
+  const invalidatedApprovalTokens = [];
+  tokenRegistry.forEach((tokenObj) => {
+    if (tokenObj.caseId === caseId && !tokenObj.used && !tokenObj.staleMeasurements) {
+      tokenObj.staleMeasurements = true;
+      tokenObj.staleAt = staleAt;
+      tokenObj.staleBy = actor;
+      invalidatedApprovalTokens.push(tokenObj.token);
+      const queueItem = state.approvalQueue.find((item) => item.approvalToken === tokenObj.token);
+      if (queueItem && queueItem.status === 'APPROVED') {
+        queueItem.status = 'STALE_MEASUREMENTS';
+        queueItem.staleAt = staleAt;
+        queueItem.staleBy = actor;
+      }
+    }
+  });
+  if (invalidatedApprovalTokens.length > 0) renderApprovalQueue();
+  if (invalidatedApprovalTokens.length > 0) syncWebMCPToolSurface(appController);
+  return invalidatedApprovalTokens;
+}
+
+export function setMeasurements({ caseId, updates, actor = 'AGENT' }) {
+  const targetCase = caseId || state.currentCase;
+  if (!Object.values(CASES).includes(targetCase) && targetCase !== state.currentCase) {
+    return { status: 'error', error: 'INVALID_CASE', caseId: targetCase, message: `Unknown case '${targetCase}'.` };
+  }
+  const validation = validateMeasurementUpdates(updates);
+  if (!validation.valid) return { ...validation.error, caseId: targetCase };
+  if (targetCase !== state.currentCase) loadCase(targetCase);
+  const previousMeasurements = { ...state.measurements };
+  const changedFields = Object.keys(updates).filter((field) => state.measurements[field] !== updates[field]);
+  if (changedFields.length === 0) {
+    return { status: 'unchanged', caseId: targetCase, measurements: { ...state.measurements }, verdict: state.referralResult.verdict, reasonCodes: state.referralResult.reasonCodes };
+  }
+  state.measurements = { ...state.measurements, ...updates };
+  writeMeasurementInputs(state.measurements);
+  const referralResult = evaluateCurrentState();
+  const invalidatedApprovalTokens = invalidateApprovalTokensForMeasurements(targetCase, actor, changedFields);
+  const result = {
+    status: 'updated',
+    caseId: targetCase,
+    updatedFields: changedFields,
+    measurements: { ...state.measurements },
+    verdict: referralResult.verdict,
+    reasonCodes: referralResult.reasonCodes,
+    domainsFlagged: referralResult.domainsFlagged,
+    invalidatedApprovalTokens: invalidatedApprovalTokens.length,
   };
+  logAuditEvent({
+    type: 'MEASUREMENTS_UPDATED',
+    actor,
+    action: `Updated biometrics for ${targetCase}`,
+    details: { caseId: targetCase, changedFields, previousMeasurements, measurements: state.measurements, invalidatedApprovalTokens: invalidatedApprovalTokens.length },
+  });
+  return result;
 }
 
 /**
@@ -411,10 +501,9 @@ function updateUI() {
 }
 
 /**
- * Run evaluation with current inputs.
+ * Run evaluation with the shared measurement state.
  */
 function evaluateCurrentState() {
-  state.measurements = readMeasurementsFromInputs();
   state.referralResult = evaluateReferral({
     imageResult: state.imageResult,
     measurements: state.measurements,
@@ -423,12 +512,56 @@ function evaluateCurrentState() {
   return state.referralResult;
 }
 
+function validateGeneratedCaseParams(params) {
+  for (const [field, value] of Object.entries(params || {})) {
+    const range = GENERATED_CASE_RANGES[field];
+    if (!range) return { valid: false, error: { status: 'error', error: 'UNKNOWN_GENERATION_PARAMETER', field, message: `Unknown generation parameter '${field}'.` } };
+    if (typeof value !== 'number' || !Number.isFinite(value) || (range.integer && !Number.isInteger(value))) return { valid: false, error: { status: 'error', error: 'GENERATION_PARAMETER_INVALID', field, acceptedRange: range, received: value } };
+    if (value < range.min || value > range.max) return { valid: false, error: { status: 'error', error: 'GENERATION_PARAMETER_OUT_OF_RANGE', field, acceptedRange: range, received: value } };
+  }
+  return { valid: true };
+}
+function loadGeneratedCase(generatedCase, actor = 'AGENT') {
+  state.currentCase = generatedCase.caseId;
+  state.generatedCase = generatedCase;
+  [elements.btnCaseA, elements.btnCaseB, elements.btnCaseC, elements.btnCaseD].filter(Boolean).forEach((button) => button.classList.remove('active'));
+  if (elements.operatorNoteText) {
+    elements.operatorNoteText.textContent = `Generated synthetic capture (seed ${generatedCase.seed}); no operator metadata.`;
+    elements.operatorNoteText.classList.remove('adversarial-text');
+  }
+  if (elements.adversarialBadge) elements.adversarialBadge.style.display = 'none';
+  state.measurements = { ...generatedCase.measurements };
+  writeMeasurementInputs(state.measurements);
+  state.cachedImageData = generatePlacidoImageData(generatedCase.caseId, 512, 512, generatedCase.renderParams);
+  state.imageResult = analyzeRings(state.cachedImageData);
+  drawCanvas();
+  evaluateCurrentState();
+  if (elements.sliderSteepening) elements.sliderSteepening.value = generatedCase.renderParams.steepening;
+  if (elements.sliderSteepeningValue) elements.sliderSteepeningValue.textContent = generatedCase.renderParams.steepening.toFixed(2);
+  if (elements.sliderSeed) elements.sliderSeed.textContent = `Seed: ${generatedCase.seed}`;
+  logAuditEvent({ type: 'CASE_GENERATED', actor, action: `Generated ${generatedCase.caseId}`, details: { caseId: generatedCase.caseId, seed: generatedCase.seed, renderParams: generatedCase.renderParams } });
+  syncWebMCPToolSurface(appController);
+  return generatedCase;
+}
+export function generateCase(params = {}, actor = 'AGENT') {
+  const validation = validateGeneratedCaseParams(params);
+  if (!validation.valid) return validation.error;
+  const generatedCase = createGeneratedCase(params);
+  loadGeneratedCase(generatedCase, actor);
+  return {
+    status: 'generated', caseId: generatedCase.caseId, seed: generatedCase.seed,
+    parameters: { ...generatedCase.renderParams, ...generatedCase.measurements },
+    measurements: { ...state.measurements }, imageResult: state.imageResult,
+    verdict: state.referralResult.verdict, reasonCodes: state.referralResult.reasonCodes,
+  };
+}
 /**
  * Load a case preset, generate synthetic image, analyze, and render.
  */
 function loadCase(caseId) {
   state.currentCase = caseId;
 
+  state.generatedCase = null;
   // Update case button active state
   elements.btnCaseA.classList.toggle('active', caseId === CASES.CASE_A);
   elements.btnCaseB.classList.toggle('active', caseId === CASES.CASE_B);
@@ -450,11 +583,8 @@ function loadCase(caseId) {
   // Populate inputs with case preset
   const preset = SYNTHETIC_MEASUREMENTS[caseId];
   if (preset) {
-    elements.inputK1.value = preset.K1.toFixed(1);
-    elements.inputK2.value = preset.K2.toFixed(1);
-    elements.inputAxis.value = preset.axis;
-    elements.inputPachy.value = preset.pachymetry;
-    elements.inputCyl.value = preset.cylinder.toFixed(2);
+    state.measurements = { ...preset };
+    writeMeasurementInputs(state.measurements);
   }
 
   // Generate synthetic image data
@@ -475,6 +605,7 @@ function loadCase(caseId) {
     action: `Loaded case preset ${caseId}`,
     details: { caseId, eye: state.currentEye, quality: state.imageResult.quality, isAdversarial: Boolean(meta.isAdversarialInjection) },
   });
+  syncWebMCPToolSurface(appController);
 
   return { eye: state.currentEye, caseId };
 }
@@ -556,10 +687,14 @@ function renderApprovalQueue() {
           mintedAt,
           used: false,
           usedAt: null,
+          staleMeasurements: false,
+          staleAt: null,
+          measurementSnapshot: { ...item.measurements },
         });
 
         item.status = 'APPROVED';
         item.approvalToken = token;
+        syncWebMCPToolSurface(appController);
         renderApprovalQueue();
 
         logAuditEvent({
@@ -580,6 +715,7 @@ function renderApprovalQueue() {
 
       btnReject.addEventListener('click', () => {
         item.status = 'REJECTED';
+        syncWebMCPToolSurface(appController);
         renderApprovalQueue();
 
         logAuditEvent({
@@ -608,6 +744,11 @@ function renderApprovalQueue() {
         <span class="token-val">${item.approvalToken}</span>
       `;
       card.appendChild(tokenContainer);
+    } else if (item.status === 'STALE_MEASUREMENTS') {
+      const statusBanner = document.createElement('div');
+      statusBanner.className = 'card-status-banner';
+      statusBanner.textContent = t('statusStaleMeasurements', currentLang);
+      card.appendChild(statusBanner);
     } else {
       const statusBanner = document.createElement('div');
       statusBanner.className = 'card-status-banner';
@@ -646,6 +787,7 @@ function queueCurrentReferral(proposedAction = '') {
   };
 
   state.approvalQueue.unshift(item);
+  syncWebMCPToolSurface(appController);
   renderApprovalQueue();
 
   logAuditEvent({
@@ -666,18 +808,19 @@ export function finalizeReport({ caseId, approvalToken }) {
 
   // Check 1: Token Missing
   if (!approvalToken) {
-    const isAdversarial = targetCase === CASES.CASE_D;
-    const actionLabel = isAdversarial
+    // Fixture label only: this is not prompt-injection detection or attribution.
+    const caseIsAdversarialFixture = targetCase === CASES.CASE_D;
+    const actionLabel = caseIsAdversarialFixture
       ? 'GUARD_VIOLATION: Unapproved finalize attempt following adversarial metadata instruction (CASE_D)'
       : 'finalize_report blocked (TOKEN_MISSING)';
-    const message = isAdversarial
+    const message = caseIsAdversarialFixture
       ? t('tokenMissingAdversarialMsg', state.currentLang)
       : t('tokenMissingMsg', state.currentLang);
 
     const errorObj = {
       status: 'blocked',
       error: GUARD_ERRORS.TOKEN_MISSING,
-      adversarialBypassAttempted: isAdversarial,
+      caseIsAdversarialFixture,
       message,
       caseId: targetCase,
     };
@@ -754,6 +897,24 @@ export function finalizeReport({ caseId, approvalToken }) {
     return errorObj;
   }
 
+  if (tokenObj.staleMeasurements) {
+    const errorObj = {
+      status: 'blocked',
+      error: GUARD_ERRORS.TOKEN_STALE_MEASUREMENTS,
+      message: 'Approval token is stale because measurements changed after clinician approval. Submit a new approval request.',
+      caseId: targetCase,
+      approvalToken,
+      staleAt: tokenObj.staleAt,
+    };
+    logAuditEvent({
+      type: 'GUARD_VIOLATION',
+      actor: 'AGENT',
+      action: 'finalize_report blocked (TOKEN_STALE_MEASUREMENTS)',
+      status: 'BLOCKED',
+      details: errorObj,
+    });
+    return errorObj;
+  }
   // Check 5: Token Expired (5 minutes = 300,000 ms)
   const tokenAge = Date.now() - tokenObj.mintedAt;
   if (tokenAge > 5 * 60 * 1000) {
@@ -804,6 +965,11 @@ export function finalizeReport({ caseId, approvalToken }) {
     details: { caseId: targetCase, approvalToken, verdict: successObj.verdict },
   });
 
+  const queueItem = state.approvalQueue.find((item) => item.approvalToken === approvalToken);
+  if (queueItem) queueItem.status = 'FINALIZED';
+  renderApprovalQueue();
+  syncWebMCPToolSurface(appController);
+
   return successObj;
 }
 
@@ -827,9 +993,9 @@ function handleDemoUnapprovedFinalize() {
 }
 
 /**
- * Demonstration trigger for Case D prompt injection bypass attempt.
+ * Deterministic Case D fixture that directly invokes the token gate.
  */
-function handleDemoCaseDInjection() {
+function handleDemoCaseDFixtureFinalize() {
   loadCase(CASES.CASE_D);
   const result = finalizeReport({ caseId: CASES.CASE_D, approvalToken: null });
 
@@ -908,7 +1074,7 @@ function setupEventListeners() {
     elements.btnDemoUnapprovedFinalize.addEventListener('click', handleDemoUnapprovedFinalize);
   }
   if (elements.btnDemoCaseDInjection) {
-    elements.btnDemoCaseDInjection.addEventListener('click', handleDemoCaseDInjection);
+    elements.btnDemoCaseDInjection.addEventListener('click', handleDemoCaseDFixtureFinalize);
   }
 
   // Export Audit Button
@@ -916,18 +1082,28 @@ function setupEventListeners() {
     elements.btnExportAudit.addEventListener('click', exportAuditLogJSON);
   }
 
-  // Input changes
-  const inputs = [
-    elements.inputK1,
-    elements.inputK2,
-    elements.inputAxis,
-    elements.inputPachy,
-    elements.inputCyl,
-  ];
+  if (elements.sliderSteepening) {
+    elements.sliderSteepening.addEventListener('input', () => {
+      const steepening = Number(elements.sliderSteepening.value);
+      const seed = state.generatedCase?.seed;
+      generateCase(seed ? { seed, steepening } : { steepening }, 'CLINICIAN');
+    });
+  }
 
-  inputs.forEach((input) => {
-    input.addEventListener('input', () => {
-      evaluateCurrentState();
+  // Input changes
+  Object.entries(measurementInputElements).forEach(([field, elementKey]) => {
+    const input = elements[elementKey];
+    input.addEventListener('change', () => {
+      const result = setMeasurements({
+        caseId: state.currentCase,
+        updates: { [field]: Number(input.value) },
+        actor: 'CLINICIAN',
+      });
+      if (result.status === 'error') {
+        input.setCustomValidity(result.message);
+        input.reportValidity();
+        writeMeasurementInputs(state.measurements);
+      }
     });
   });
 }
@@ -943,6 +1119,8 @@ export const appController = {
     return state.imageResult;
   },
   getMeasurements: () => ({ ...state.measurements }),
+  generateCase: (params, actor) => generateCase(params, actor),
+  setMeasurements: ({ caseId, updates, actor }) => setMeasurements({ caseId, updates, actor }),
   evaluateActiveReferral: () => evaluateCurrentState(),
   getState: () => ({ ...state }),
   setLanguage: (lang) => applyLanguage(lang),
@@ -962,14 +1140,10 @@ applyLanguage('en');
 loadCase(CASES.CASE_A);
 renderApprovalQueue();
 
-// Register WebMCP Tools
-const registrationResult = registerWebMCPTools(appController);
-
-// Update WebMCP status badge & loud shim announcement bar
-const webmcpBadge = document.getElementById('webmcp-badge');
-const shimBar = document.getElementById('shim-announcement-bar');
-
-if (registrationResult.modelContextAvailable) {
+function updateWebMCPStatus(registrationResult) {
+  const webmcpBadge = document.getElementById('webmcp-badge');
+  const shimBar = document.getElementById('shim-announcement-bar');
+  if (registrationResult.modelContextAvailable) {
   if (webmcpBadge) {
     webmcpBadge.textContent = `NATIVE WebMCP [${registrationResult.toolsCount} TOOLS]`;
     webmcpBadge.className = 'webmcp-badge active';
@@ -978,7 +1152,7 @@ if (registrationResult.modelContextAvailable) {
   if (shimBar) {
     shimBar.style.display = 'none';
   }
-} else {
+  } else {
   if (webmcpBadge) {
     webmcpBadge.textContent = `COMPATIBILITY SHIM [${registrationResult.toolsCount} TOOLS]`;
     webmcpBadge.className = 'webmcp-badge shimmed';
@@ -987,7 +1161,12 @@ if (registrationResult.modelContextAvailable) {
   if (shimBar) {
     shimBar.style.display = 'block';
   }
+  }
 }
+
+// Register only the tools that the initial app state needs; later transitions resync this surface.
+const registrationResult = registerWebMCPTools(appController, updateWebMCPStatus);
+updateWebMCPStatus(registrationResult);
 
 // Teardown registration on window unload
 window.addEventListener('beforeunload', () => {

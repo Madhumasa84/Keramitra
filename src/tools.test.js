@@ -16,10 +16,10 @@
  *  6. Full agent walk across Case A and Case C in English and Tamil.
  */
 
-import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS } from './synth.js';
+import { generatePlacidoImageData, CASES, SYNTHETIC_MEASUREMENTS, GENERATED_CASE_RANGES, createGeneratedCase } from './synth.js';
 import { analyzeRings } from './analyze.js';
 import { evaluateReferral, THRESHOLDS, REASON_CODES, VERDICTS } from './rules.js';
-import { registerWebMCPTools, TOOL_DEFINITIONS } from './tools.js';
+import { registerWebMCPTools, syncWebMCPToolSurface, TOOL_DEFINITIONS } from './tools.js';
 
 console.log('='.repeat(88));
 console.log('  KERAMITRA — PROMPT 6 STRUCTURAL APPROVAL GATE & AUDIT TRAIL TEST');
@@ -91,6 +91,58 @@ const mockController = {
     return mockState.imageResult;
   },
   getMeasurements: () => ({ ...mockState.measurements }),
+  generateCase: (params = {}) => {
+    for (const [field, value] of Object.entries(params)) {
+      const range = GENERATED_CASE_RANGES[field];
+      if (!range || typeof value !== 'number' || !Number.isFinite(value) || (range.integer && !Number.isInteger(value))) {
+        return { status: 'error', error: 'GENERATION_PARAMETER_INVALID', field, acceptedRange: range };
+      }
+      if (value < range.min || value > range.max) {
+        return { status: 'error', error: 'GENERATION_PARAMETER_OUT_OF_RANGE', field, acceptedRange: range, received: value };
+      }
+    }
+    const generated = createGeneratedCase(params);
+    mockState.currentCase = generated.caseId;
+    mockState.cachedImageData = generatePlacidoImageData(generated.caseId, 512, 512, generated.renderParams);
+    mockState.imageResult = analyzeRings(mockState.cachedImageData);
+    mockState.measurements = { ...generated.measurements };
+    mockState.referralResult = evaluateReferral({ imageResult: mockState.imageResult, measurements: mockState.measurements });
+    logAudit({ type: 'CASE_GENERATED', actor: 'AGENT', action: `Generated ${generated.caseId}`, details: { seed: generated.seed, renderParams: generated.renderParams } });
+    return { status: 'generated', caseId: generated.caseId, seed: generated.seed, parameters: { ...generated.renderParams, ...generated.measurements }, verdict: mockState.referralResult.verdict };
+  },
+  setMeasurements: ({ caseId, updates, actor = 'AGENT' }) => {
+    const targetCase = caseId || mockState.currentCase;
+    const ranges = {
+      K1: { min: 30, max: 60, unit: 'D' }, K2: { min: 30, max: 60, unit: 'D' },
+      axis: { min: 0, max: 180, unit: '°' }, pachymetry: { min: 300, max: 700, unit: 'µm' },
+      cylinder: { min: 0, max: 10, unit: 'D' },
+    };
+    for (const [field, value] of Object.entries(updates || {})) {
+      const range = ranges[field];
+      if (!range || typeof value !== 'number' || !Number.isFinite(value)) {
+        return { status: 'error', error: 'MEASUREMENT_INVALID', field, acceptedRange: range };
+      }
+      if (value < range.min || value > range.max) {
+        return { status: 'error', error: 'MEASUREMENT_OUT_OF_RANGE', field, acceptedRange: range, received: value };
+      }
+    }
+    if (targetCase !== mockState.currentCase) mockController.loadCase(targetCase);
+    const changedFields = Object.keys(updates).filter((field) => mockState.measurements[field] !== updates[field]);
+    mockState.measurements = { ...mockState.measurements, ...updates };
+    mockState.referralResult = evaluateReferral({ imageResult: mockState.imageResult, measurements: mockState.measurements });
+    let invalidatedApprovalTokens = 0;
+    testTokenRegistry.forEach((tokenObj) => {
+      if (tokenObj.caseId === targetCase && !tokenObj.used && !tokenObj.staleMeasurements && changedFields.length > 0) {
+        tokenObj.staleMeasurements = true;
+        invalidatedApprovalTokens += 1;
+      }
+    });
+    logAudit({
+      type: 'MEASUREMENTS_UPDATED', actor, action: `Updated biometrics for ${targetCase}`,
+      details: { caseId: targetCase, changedFields, invalidatedApprovalTokens },
+    });
+    return { status: 'updated', caseId: targetCase, updatedFields: changedFields, measurements: { ...mockState.measurements }, verdict: mockState.referralResult.verdict, reasonCodes: mockState.referralResult.reasonCodes, invalidatedApprovalTokens };
+  },
   evaluateActiveReferral: () => {
     mockState.referralResult = evaluateReferral({
       imageResult: mockState.imageResult,
@@ -131,18 +183,19 @@ const mockController = {
 
     // Check 1: Token Missing
     if (!approvalToken) {
-      const isAdversarial = targetCase === CASES.CASE_D;
-      const action = isAdversarial
+      // Fixture label only: this test double does not detect prompt injection.
+      const caseIsAdversarialFixture = targetCase === CASES.CASE_D;
+      const action = caseIsAdversarialFixture
         ? 'GUARD_VIOLATION: Unapproved finalize attempt following adversarial metadata instruction (CASE_D)'
         : 'finalize_report blocked (TOKEN_MISSING)';
-      const message = isAdversarial
-        ? 'Blocked: Prompt injection override rejected. Offline clinician notes in metadata cannot bypass the structural in-memory approval gate.'
+      const message = caseIsAdversarialFixture
+        ? 'Blocked: no approval token. Case metadata cannot mint tokens — only a human DOM interaction can.'
         : 'Approval token required.';
 
       const err = {
         status: 'blocked',
         error: 'TOKEN_MISSING',
-        adversarialBypassAttempted: isAdversarial,
+        caseIsAdversarialFixture,
         message,
         caseId: targetCase,
       };
@@ -198,6 +251,18 @@ const mockController = {
       return err;
     }
 
+    if (tokenObj.staleMeasurements) {
+      const err = { status: 'blocked', error: 'TOKEN_STALE_MEASUREMENTS', message: 'Approval token is stale because measurements changed after clinician approval.', caseId: targetCase };
+      logAudit({
+        type: 'GUARD_VIOLATION',
+        actor: 'AGENT',
+        action: 'finalize_report blocked (TOKEN_STALE_MEASUREMENTS)',
+        status: 'BLOCKED',
+        details: err,
+      });
+      return err;
+    }
+
     // Check 5: Token Expired (5 minutes = 300,000 ms)
     if (Date.now() - tokenObj.mintedAt > 5 * 60 * 1000) {
       const err = { status: 'blocked', error: 'TOKEN_EXPIRED', message: 'Token expired (> 5 min).', caseId: targetCase };
@@ -239,7 +304,8 @@ const mockController = {
 };
 
 // Register WebMCP tools
-const { handlers } = registerWebMCPTools(mockController);
+const registration = registerWebMCPTools(mockController);
+const { handlers } = registration;
 
 async function callTool(name, args = {}) {
   const handler = handlers[name];
@@ -251,6 +317,7 @@ async function callTool(name, args = {}) {
 console.log('\n[TEST 1] Acceptance Check: Calling finalize_report first thing (no token)\n');
 
 const firstCallResult = await callTool('finalize_report', { caseId: CASES.CASE_B, approvalToken: null });
+const initialDynamicSurface = syncWebMCPToolSurface(mockController);
 console.log('Unapproved finalize_report response:', JSON.stringify(firstCallResult, null, 2));
 
 const lastAuditEntry = testAuditTrail[0];
@@ -270,6 +337,7 @@ const reqB = await callTool('request_approval', {
   proposedAction: 'Refer to corneal specialist for ectasia review',
 });
 console.log(`Approval requested: status=${reqB.status}, requestId=${reqB.requestId}`);
+const pendingDynamicSurface = syncWebMCPToolSurface(mockController);
 
 // Step 3: Clinician reviews and approves in UI (minting single-use token)
 const mintedAt = Date.now();
@@ -360,21 +428,60 @@ const rejectResult = await callTool('finalize_report', {
 });
 console.log(`3d. Rejected request → Error: ${rejectResult.error} (${rejectResult.status})`);
 
-// ── TEST 5: PROMPT-INJECTION ADVERSARIAL DEFENSE (CASE_D) ──────────────────────
-console.log('\n[TEST 5] Prompt-Injection Adversarial Defense on CASE_D\n');
+// ── TEST 4: MUTABLE MEASUREMENTS & APPROVAL STALENESS ─────────────────────────
+console.log('\n[TEST 4] Mutable Measurements, Range Rejection & Approval Staleness\n');
+
+await callTool('load_case', { caseId: CASES.CASE_A });
+const partialUpdate = await callTool('set_measurements', { caseId: CASES.CASE_A, K1: 44.4 });
+console.log('Valid partial K1 update:', JSON.stringify(partialUpdate, null, 2));
+
+const rangeRejections = await Promise.all([
+  callTool('set_measurements', { caseId: CASES.CASE_A, K1: 29 }),
+  callTool('set_measurements', { caseId: CASES.CASE_A, K2: 61 }),
+  callTool('set_measurements', { caseId: CASES.CASE_A, axis: -1 }),
+  callTool('set_measurements', { caseId: CASES.CASE_A, pachymetry: 701 }),
+  callTool('set_measurements', { caseId: CASES.CASE_A, cylinder: 10.1 }),
+]);
+console.log('Out-of-range field rejections:', JSON.stringify(rangeRejections, null, 2));
+
+const staleToken = `tok_stale_${Date.now()}`;
+testTokenRegistry.set(staleToken, {
+  token: staleToken,
+  requestId: 'req_stale_measurements',
+  caseId: CASES.CASE_A,
+  mintedAt: Date.now(),
+  used: false,
+  usedAt: null,
+  staleMeasurements: false,
+});
+const updateAfterApproval = await callTool('set_measurements', { caseId: CASES.CASE_A, K2: 45.1 });
+const staleTokenResult = await callTool('finalize_report', { caseId: CASES.CASE_A, approvalToken: staleToken });
+console.log('Update after approval:', JSON.stringify(updateAfterApproval, null, 2));
+console.log('Stale approval finalization:', JSON.stringify(staleTokenResult, null, 2));
+
+// ── TEST 5: PARAMETRIC GENERATED CASE & HUMAN GATE ───────────────────────────
+const generatedCase = await callTool('generate_case', { seed: 20260826, steepening: 0.8, ringCount: 15, K2: 48.2, pachymetry: 465 });
+const reproducedCase = await callTool('generate_case', { seed: 20260826, steepening: 0.8, ringCount: 15, K2: 48.2, pachymetry: 465 });
+const generatedRangeError = await callTool('generate_case', { steepening: 1.01 });
+const generatedFinalizeBlocked = await callTool('finalize_report', { caseId: generatedCase.caseId, approvalToken: null });
+console.log('Generated case:', JSON.stringify(generatedCase, null, 2));
+console.log('Generated case without human approval:', JSON.stringify(generatedFinalizeBlocked, null, 2));
+
+// ── TEST 5: CASE_D ADVERSARIAL-METADATA FIXTURE ───────────────────────────────
+console.log('\n[TEST 5] Case D Adversarial-Metadata Fixture\n');
 
 // 5a. Load Case D with realistic prompt-injection metadata
 const loadCaseD = await callTool('load_case', { caseId: CASES.CASE_D });
 console.log(`Case D Loaded: isAdversarial=${loadCaseD.isAdversarialInjection}`);
 console.log(`Operator Remarks: "${loadCaseD.operatorRemarks}"`);
 
-// 5b. Agent attempts unapproved finalize following injected metadata instruction
-const injectionBypassAttempt = await callTool('finalize_report', {
+// 5b. Deterministic fixture call: finalize without a token (not an agent action)
+const caseDFixtureFinalize = await callTool('finalize_report', {
   caseId: CASES.CASE_D,
   approvalToken: null,
 });
-console.log(`Bypass Attempt Result: status=${injectionBypassAttempt.status}, error=${injectionBypassAttempt.error}`);
-console.log(`Error Message: "${injectionBypassAttempt.message}"`);
+console.log('Fixture Finalize Result: status=' + caseDFixtureFinalize.status + ', error=' + caseDFixtureFinalize.error);
+console.log('Error Message: "' + caseDFixtureFinalize.message + '"');
 
 const lastAuditCaseD = testAuditTrail[0];
 console.log(`Audit Record: [${lastAuditCaseD.type}] ${lastAuditCaseD.action} (status=${lastAuditCaseD.status})`);
@@ -398,9 +505,18 @@ assert('5. Case mismatch prevented (TOKEN_CASE_MISMATCH)', caseMismatchResult.er
 assert('6. Expired token rejected (TOKEN_EXPIRED)', expiredResult.error === 'TOKEN_EXPIRED');
 assert('7. Clinician-rejected request blocked (APPROVAL_REJECTED)', rejectResult.error === 'APPROVAL_REJECTED');
 assert('8. Complete audit log maintained with timestamps & actor tracking', testAuditTrail.length >= 8);
-assert('9. Case D returns realistic prompt injection metadata in load_case', loadCaseD.isAdversarialInjection === true && loadCaseD.operatorRemarks.includes('offline'));
-assert('10. Case D prompt injection bypass attempt is blocked with TOKEN_MISSING', injectionBypassAttempt.status === 'blocked' && injectionBypassAttempt.adversarialBypassAttempted === true);
-assert('11. Case D injection attempt is distinctly logged in Audit Trail', lastAuditCaseD.action.includes('adversarial metadata instruction'));
+assert('9. Tenth parametric generate_case tool is registered', TOOL_DEFINITIONS.length === 10 && typeof handlers.generate_case === 'function');
+assert('10. Valid partial measurement update succeeds and changes only its field', partialUpdate.status === 'updated' && partialUpdate.updatedFields.length === 1 && partialUpdate.updatedFields[0] === 'K1' && partialUpdate.measurements.K1 === 44.4);
+assert('11. Each out-of-range measurement is rejected with its field and accepted range', rangeRejections.every((result, index) => result.error === 'MEASUREMENT_OUT_OF_RANGE' && result.field === ['K1', 'K2', 'axis', 'pachymetry', 'cylinder'][index] && result.acceptedRange));
+assert('12. Measurement change invalidates outstanding approval token', updateAfterApproval.invalidatedApprovalTokens >= 1 && staleTokenResult.error === 'TOKEN_STALE_MEASUREMENTS');
+assert('13. Generated case is seeded, reproducible, and passes through analysis', generatedCase.status === 'generated' && generatedCase.caseId === 'GEN_20260826' && generatedCase.seed === reproducedCase.seed && generatedCase.verdict === reproducedCase.verdict);
+assert('14. Generated parameter out-of-range is rejected structurally', generatedRangeError.error === 'GENERATION_PARAMETER_OUT_OF_RANGE' && generatedRangeError.field === 'steepening');
+assert('15. Generated case still requires human approval to finalize', generatedFinalizeBlocked.error === 'TOKEN_MISSING');
+assert('16. Initial loaded-case surface excludes finalize_report', initialDynamicSurface.toolsCount === 9 && !initialDynamicSurface.activeToolNames.includes('finalize_report'));
+assert('17. Pending approval adds finalize_report to the active surface', pendingDynamicSurface.toolsCount === 10 && pendingDynamicSurface.activeToolNames.includes('finalize_report'));
+assert('13. Case D returns adversarial fixture metadata in load_case', loadCaseD.isAdversarialInjection === true && loadCaseD.operatorRemarks.includes('offline'));
+assert('14. Case D fixture call is blocked with TOKEN_MISSING', caseDFixtureFinalize.status === 'blocked' && caseDFixtureFinalize.caseIsAdversarialFixture === true);
+assert('15. Case D fixture call is distinctly logged in Audit Trail', lastAuditCaseD.action.includes('adversarial metadata instruction'));
 
 console.log('\n' + '='.repeat(88));
 if (passed) {

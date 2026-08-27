@@ -91,9 +91,9 @@ async function runComprehensiveVerification() {
     console.log(`- Shim announcement bar hidden: ${!nativeBarVisible ? 'YES (CLEAN)' : 'NO'}`);
 
     const registeredCount = await nativePage.evaluate(() => document.modelContext.listTools().length);
-    console.log(`- Tools successfully registered on document.modelContext: ${registeredCount} / 8`);
+    console.log(`- Tools successfully registered on document.modelContext: ${registeredCount} / 9 before an approval request`);
 
-    if (shimBadgeText.includes('SHIM') && shimBarVisible && nativeBadgeText.includes('NATIVE') && !nativeBarVisible && registeredCount === 8) {
+    if (shimBadgeText.includes('SHIM') && shimBarVisible && nativeBadgeText.includes('NATIVE') && !nativeBarVisible && registeredCount === 9) {
       results.step2_webmcp_detection = true;
       console.log('>>> STEP 2 PASSED!\n');
     } else {
