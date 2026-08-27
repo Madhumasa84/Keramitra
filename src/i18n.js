@@ -302,17 +302,39 @@ export function generateEvidenceExplanation({
         pachymetry: 'கார்னியா தடிமன்',
       };
       const flaggedDesc = domainsFlagged.map((d) => domainNames[d] || d).join(', ');
-      return (
-        `கண் மருத்துவரிடம் பரிந்துரைக்க வேண்டும் (REFER): கண் கார்னியாவின் கீழ் பகுதியில் வளையங்கள் ` +
-        `நெருக்கமாகவும் வளைந்தும் காணப்படுகின்றன (I-S குறியீடு: ${isAsymmetry?.toFixed(3)}, இடைவெளி மாறுபாடு: ${spacingCV?.toFixed(3)}). ` +
-        `இதனுடன் கார்னியா வளைவு அதிகமாகவும் (K2: ${K2?.toFixed(1)} D > 47.0 D) மையக் கார்னியா மிக மெலிதாகவும் ` +
-        `(${pachymetry} µm < 470 µm) உள்ளது. இந்த முக்கிய குறைபாடுகள் (${flaggedDesc}) ` +
-        `கார்னியா கூம்பு நோய் (கெரடோகோனஸ்) சாத்தியத்தைக் காட்டுவதால், உடனடியாக சிறப்பு கண் மருத்துவரிடம் பரிசோதனைக்கு அனுப்ப வேண்டும்.`
-      );
+
+      // Only state a finding whose reason code actually fired. REFER can be reached
+      // from any single domain, so an unconditional template would assert findings
+      // the numbers it quotes in the same sentence contradict.
+      const findings = [];
+      if (reasonCodes.includes(REASON_CODES.IMG_SUSPICIOUS)) {
+        findings.push(
+          `கண் கார்னியாவின் கீழ் பகுதியில் வளையங்கள் நெருக்கமாகவும் வளைந்தும் காணப்படுகின்றன ` +
+          `(I-S குறியீடு: ${isAsymmetry?.toFixed(3)}, இடைவெளி மாறுபாடு: ${spacingCV?.toFixed(3)})`
+        );
+      }
+      if (reasonCodes.includes(REASON_CODES.K_HIGH)) {
+        findings.push(`கார்னியா வளைவு அதிகமாக உள்ளது (K2: ${K2?.toFixed(1)} D > 47.0 D)`);
+      }
+      if (reasonCodes.includes(REASON_CODES.PACHY_LOW)) {
+        findings.push(`மையக் கார்னியா மிக மெலிதாக உள்ளது (${pachymetry} µm < 470 µm)`);
+      }
+      if (reasonCodes.includes(REASON_CODES.CYL_HIGH)) {
+        findings.push(`கண்ணின் உருளைத்திறன் அதிகமாக உள்ளது (${cylinder?.toFixed(2)} D > 1.50 D)`);
+      }
+
+      const findingsText = findings.length > 0
+        ? findings.join('; ')
+        : `விதிமுறை வரம்பு தாண்டியுள்ளது (${reasonCodes.join(', ')})`;
+      const closing = reasonCodes.includes(REASON_CODES.TWO_DOMAIN_ABNORMAL)
+        ? `இரண்டுக்கும் மேற்பட்ட பகுதிகளில் (${flaggedDesc}) குறைபாடு இருப்பதால், கார்னியா கூம்பு நோய் (கெரடோகோனஸ்) சாத்தியத்தை ஒதுக்க முடியாது. உடனடியாக சிறப்பு கண் மருத்துவரிடம் பரிசோதனைக்கு அனுப்ப வேண்டும்.`
+        : `குறைபாடு உள்ள பகுதி (${flaggedDesc}). உறுதிப்படுத்த சிறப்பு கண் மருத்துவரிடம் பரிசோதனைக்கு அனுப்ப வேண்டும்.`;
+
+      return `கண் மருத்துவரிடம் பரிந்துரைக்க வேண்டும் (REFER): ${findingsText}. ${closing}`;
     }
 
     return (
-      `வழக்கமான கண் பரிசோதனை போதுமானது (ROUTINE_FOLLOWUP): கார்னியா வளையங்கள் 360 பாகைகளிலும் ` +
+      `வழக்கமான கண் பரிசோதனை போதுமானது (ROUTINE_FOLLOWUP): தெளிவாகப் பதிவான ${meridiansUsable ?? '--'} கோணங்களிலும் கார்னியா வளையங்கள் ` +
       `சீரான இடைவெளியுடன் வட்டமாக உள்ளன (இடைவெளி மாறுபாடு: ${spacingCV?.toFixed(3)}, சமச்சீரின்மை: ${isAsymmetry?.toFixed(3)}). ` +
       `கார்னியா வளைவு (K2: ${K2?.toFixed(1)} D) மற்றும் மையத் தடிமன் (${pachymetry} µm) நல்ல இயல்பான அளவில் உள்ளன. ` +
       `சிறப்பு பரிந்துரை தேவையில்லை.`
@@ -332,18 +354,43 @@ export function generateEvidenceExplanation({
   if (verdict === VERDICTS.REFER) {
     const reasonsStr = reasonCodes.join(', ');
     const domainsStr = domainsFlagged.join(', ');
+
+    // Only state a finding whose reason code actually fired. REFER can be reached
+    // from any single domain, so an unconditional template would assert findings
+    // the numbers it quotes in the same sentence contradict.
+    const findings = [];
+    if (reasonCodes.includes(REASON_CODES.IMG_SUSPICIOUS)) {
+      findings.push(
+        `Placido mire analysis shows irregular or inferiorly crowded rings ` +
+        `(I-S asymmetry index: ${isAsymmetry?.toFixed(3)}, Spacing CV: ${spacingCV?.toFixed(3)})`
+      );
+    }
+    if (reasonCodes.includes(REASON_CODES.K_HIGH)) {
+      findings.push(`steep keratometry (K2: ${K2?.toFixed(1)} D > 47.0 D)`);
+    }
+    if (reasonCodes.includes(REASON_CODES.PACHY_LOW)) {
+      findings.push(`thin central pachymetry (${pachymetry} µm < 470 µm)`);
+    }
+    if (reasonCodes.includes(REASON_CODES.CYL_HIGH)) {
+      findings.push(`elevated cylinder (${cylinder?.toFixed(2)} D > 1.50 D)`);
+    }
+
+    const findingsText = findings.length > 0
+      ? findings.join('; ')
+      : `rule thresholds crossed (${reasonsStr})`;
+    const closing = reasonCodes.includes(REASON_CODES.TWO_DOMAIN_ABNORMAL)
+      ? `Two or more independent domains are abnormal, so corneal ectasia cannot be excluded. Escalate for specialist clinical assessment.`
+      : `Escalate for specialist clinical assessment to confirm or exclude the finding.`;
+
     return (
-      `Referral indicated (REFER): Placido mire analysis shows significant inferior ring crowding ` +
-      `(I-S asymmetry index: ${isAsymmetry?.toFixed(3)}, Spacing CV: ${spacingCV?.toFixed(3)}). ` +
-      `Corroborated by steep keratometry (K2: ${K2?.toFixed(1)} D > 47.0 D) and thin central pachymetry ` +
-      `(${pachymetry} µm < 470 µm), triggering abnormal domains: {${domainsStr}} with codes [${reasonsStr}]. ` +
-      `Escalate for specialist clinical assessment of corneal ectasia.`
+      `Referral indicated (REFER): ${findingsText}. ` +
+      `Abnormal domains: {${domainsStr}} with codes [${reasonsStr}]. ${closing}`
     );
   }
 
   return (
     `Routine follow-up (ROUTINE_FOLLOWUP): Placido mire reflections demonstrate regular, concentric, ` +
-    `and evenly spaced rings across all 360 meridians (Spacing CV: ${spacingCV?.toFixed(3)}, ` +
+    `and evenly spaced rings across ${meridiansUsable ?? '--'} of 360 usable meridians (Spacing CV: ${spacingCV?.toFixed(3)}, ` +
     `I-S asymmetry: ${isAsymmetry?.toFixed(3)}). Keratometric steep-K (K2: ${K2?.toFixed(1)} D) ` +
     `and central corneal thickness (${pachymetry} µm) are within normal baseline limits.`
   );
