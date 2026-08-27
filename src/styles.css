@@ -833,6 +833,18 @@ html, body {
   border-left: 3px solid var(--text-dim);
 }
 
+.queue-card.status-pending {
+  border-left: 3px solid var(--verdict-repeat-text);
+}
+
+.queue-card.status-stale_measurements {
+  border-left: 3px solid var(--verdict-repeat-text);
+}
+
+.queue-card.status-finalized {
+  border-left: 3px solid var(--accent-action);
+}
+
 .card-header {
   display: flex;
   align-items: center;

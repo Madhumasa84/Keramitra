@@ -749,6 +749,11 @@ function renderApprovalQueue() {
       statusBanner.className = 'card-status-banner';
       statusBanner.textContent = t('statusStaleMeasurements', currentLang);
       card.appendChild(statusBanner);
+    } else if (item.status === 'FINALIZED') {
+      const statusBanner = document.createElement('div');
+      statusBanner.className = 'card-status-banner';
+      statusBanner.textContent = t('statusFinalized', currentLang);
+      card.appendChild(statusBanner);
     } else {
       const statusBanner = document.createElement('div');
       statusBanner.className = 'card-status-banner';

@@ -111,6 +111,7 @@ export const STRINGS = {
     statusApproved: 'Approved',
     statusStaleMeasurements: 'Approval stale — measurements changed; submit a new request.',
     statusRejected: 'Rejected',
+    statusFinalized: 'Report finalized with clinical sign-off',
     tokenLabel: 'Single-use token (valid 5 min)',
 
     // Security Gate & Demo
@@ -230,6 +231,7 @@ export const STRINGS = {
     statusApproved: 'ஒப்புதல் அளிக்கப்பட்டது',
     statusStaleMeasurements: 'அளவீடுகள் மாறிவிட்டன — புதிய ஒப்புதல் கோரிக்கையைச் சமர்ப்பிக்கவும்.',
     statusRejected: 'நிராகரிக்கப்பட்டது',
+    statusFinalized: 'மருத்துவர் ஒப்புதலுடன் அறிக்கை முடிக்கப்பட்டது',
     tokenLabel: 'ஒருமுறை பயன்பாட்டு டோக்கன் (5 நிமிடம் மட்டும்)',
 
     // Security Gate & Demo
