@@ -414,7 +414,13 @@ export function setMeasurements({ caseId, updates, actor = 'AGENT' }) {
   const previousMeasurements = { ...state.measurements };
   const changedFields = Object.keys(updates).filter((field) => state.measurements[field] !== updates[field]);
   if (changedFields.length === 0) {
-    return { status: 'unchanged', caseId: targetCase, measurements: { ...state.measurements }, verdict: state.referralResult.verdict, reasonCodes: state.referralResult.reasonCodes };
+    return {
+      status: 'unchanged',
+      caseId: targetCase,
+      measurements: { ...state.measurements },
+      verdict: state.referralResult?.verdict ?? null,
+      reasonCodes: state.referralResult?.reasonCodes ?? [],
+    };
   }
   state.measurements = { ...state.measurements, ...updates };
   writeMeasurementInputs(state.measurements);
@@ -511,7 +517,7 @@ function updateUI() {
   }
 
   // Update submit referral button state & text according to active verdict
-  elements.btnQueueReferral.disabled = !referralResult || !referralResult.verdict;
+  elements.btnQueueReferral.disabled = !referralResult.verdict;
   elements.btnQueueReferral.textContent = referralResult.verdict === VERDICTS.REPEAT_SCAN
     ? t('queueRepeatBtn', currentLang)
     : t('queueReferralBtn', currentLang);
@@ -993,7 +999,7 @@ export function finalizeReport({ caseId, approvalToken }) {
     reasonCodes: [...approvedRequest.reasonCodes],
     domainsFlagged: [...(approvedRequest.domainsFlagged || [])],
     measurements: { ...approvedRequest.measurements },
-    imageMetrics: { ...approvedRequest.imageResult.metrics },
+    imageMetrics: { ...(approvedRequest.imageResult?.metrics ?? {}) },
     clinicalSignOff: {
       requestId: tokenObj.requestId,
       mintedAt: new Date(tokenObj.mintedAt).toISOString(),

@@ -12,6 +12,10 @@ let registeredToolHandlers = null;
 let registeredController = null;
 let toolSurfaceListener = null;
 let activeToolNames = new Set();
+let hostCannotWithdraw = false;
+
+/** True when the attached host can register but not withdraw tools. */
+export function hostSupportsWithdrawal() { return !hostCannotWithdraw; }
 
 // ── Tool-call instrumentation ────────────────────────────────────────────────
 // Every invocation is recorded, whatever transport it arrived on, so the visible
@@ -162,9 +166,18 @@ export function syncWebMCPToolSurface(controller = registeredController) {
   const desired = getDesiredToolNames(controller);
   const modelContext = getModelContext();
   if (modelContext && typeof modelContext.registerTool === 'function') {
+    const canUnregister = typeof modelContext.unregisterTool === 'function';
+    if (!canUnregister && !hostCannotWithdraw) {
+      hostCannotWithdraw = true;
+      console.warn(
+        'WebMCP host implements registerTool but not unregisterTool. Tools that leave the ' +
+        'desired surface cannot be withdrawn from it, so the host may continue to advertise ' +
+        'them. In-page dispatch still honours the surface.'
+      );
+    }
     const registered = new Set(registeredToolNames);
     registered.forEach((name) => {
-      if (!desired.has(name) && typeof modelContext.unregisterTool === 'function') {
+      if (!desired.has(name) && canUnregister) {
         try { modelContext.unregisterTool(name); } catch (err) { console.warn(`WebMCP unregistration for ${name} encountered:`, err); }
         registered.delete(name);
       }
@@ -559,6 +572,12 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
       const caseId = resolveCaseId(controller, params?.caseId, { required: true, toolName: 'request_approval' });
       const proposedAction = params?.proposedAction || 'Clinical review';
       const queueItem = controller.queueReferralRequest({ caseId, proposedAction });
+      if (!queueItem) {
+        throw new Error(
+          `Cannot queue approval for '${caseId}': the case has not been evaluated yet. ` +
+          `Call evaluate_referral first so the request card carries a verdict.`
+        );
+      }
       return {
         status: 'pending',
         requestId: queueItem.id.toString(),
@@ -579,6 +598,13 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
   const instrumentedHandlers = Object.fromEntries(
     Object.entries(toolHandlers).map(([name, fn]) => [name, instrument(name, fn)])
   );
+
+  if (registeredToolHandlers && registeredController !== controller) {
+    // The host still holds execute references to the previous closures, and sync()
+    // will not re-register names it already tracks. Drop them first so the new
+    // controller's handlers actually replace the old ones.
+    unregisterWebMCPTools();
+  }
 
   registeredController = controller;
   registeredToolHandlers = instrumentedHandlers;
@@ -631,4 +657,5 @@ export function unregisterWebMCPTools() {
   registeredToolHandlers = null;
   registeredController = null;
   toolSurfaceListener = null;
+  hostCannotWithdraw = false;
 }

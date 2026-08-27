@@ -226,6 +226,36 @@ check('A call the surface withholds is still logged', tools.getCallLog().length 
 check('Withheld calls are marked, not silently dropped', withheldEntry.status === 'withheld' && Boolean(withheldEntry.error));
 check('Withheld calls render as blocked in the Inspector', callRows()[0].classList.contains('is-blocked'));
 
+// ── 10. Robustness ────────────────────────────────────────────────────────────
+console.log('\n[10] Robustness on the paths the audit flagged  [regression: AUDIT #9 and #11]\n');
+
+// A no-op mutation must not dereference a possibly-null referralResult.
+appController.loadCase('CASE_B');
+const current = appController.getState().measurements;
+const noop = setMeasurements({ caseId: 'CASE_B', updates: { K2: current.K2 }, actor: 'AGENT' });
+check('A no-op mutation returns unchanged without throwing', noop.status === 'unchanged' && Array.isArray(noop.reasonCodes));
+check('A no-op mutation leaves an outstanding approval alone', noop.invalidatedApprovalTokens === undefined);
+
+// Out-of-range and non-numeric mutations are rejected, not clamped.
+const outOfRange = setMeasurements({ caseId: 'CASE_B', updates: { pachymetry: 999 }, actor: 'AGENT' });
+check('Out-of-range mutation is rejected with field and range', outOfRange.error === 'MEASUREMENT_OUT_OF_RANGE' && outOfRange.field === 'pachymetry' && Boolean(outOfRange.acceptedRange));
+const notNumeric = setMeasurements({ caseId: 'CASE_B', updates: { K1: 'forty' }, actor: 'AGENT' });
+check('Non-numeric mutation is rejected, not coerced', notNumeric.error === 'MEASUREMENT_INVALID' && notNumeric.field === 'K1');
+const emptyUpdate = setMeasurements({ caseId: 'CASE_B', updates: {}, actor: 'AGENT' });
+check('An empty mutation is rejected', emptyUpdate.error === 'NO_MEASUREMENTS_PROVIDED');
+check('Measurements survived every rejected mutation', appController.getState().measurements.pachymetry === current.pachymetry && appController.getState().measurements.K1 === current.K1);
+
+// Generation parameters are range-checked before anything is rendered.
+const badGen = generateCase({ steepening: 1.4 }, 'AGENT');
+check('Out-of-range generation parameter is rejected structurally', badGen.error === 'GENERATION_PARAMETER_OUT_OF_RANGE' && badGen.field === 'steepening');
+const unknownGen = generateCase({ nonsense: 3 }, 'AGENT');
+check('Unknown generation parameter is rejected', unknownGen.error === 'UNKNOWN_GENERATION_PARAMETER');
+
+// Same seed, same case — the generator is reproducible.
+const g1 = generateCase({ seed: 31337, steepening: 0.62 }, 'AGENT');
+const g2 = generateCase({ seed: 31337, steepening: 0.62 }, 'AGENT');
+check('Same seed reproduces the same case id and metrics', g1.caseId === g2.caseId && g1.imageResult.spacingCV === g2.imageResult.spacingCV && g1.verdict === g2.verdict, `${g1.caseId} spacingCV=${g1.imageResult.spacingCV}`);
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + SEP);
 if (failures === 0) {
