@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "node src/analyze.test.js",
     "test:rules": "node src/rules.test.js",
-    "test:tools": "node src/tools.test.js"
+    "test:tools": "node src/tools.test.js",
+    "test:gate": "node src/gate.test.js",
+    "test:all": "npm test && npm run test:rules && npm run test:tools && npm run test:gate"
   },
   "devDependencies": {
     "vite": "^8.2.2"

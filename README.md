@@ -92,14 +92,30 @@ cd Keramitra
 npm install
 
 # Run automated test suites
-npm test               # Core image-analysis tests
+npm run test:all       # All four suites in sequence
+
+npm test               # Core image-analysis tests (analyze.js on synthetic pixels)
 npm run test:rules     # Load-bearing proof (real image vs. stub image)
-npm run test:tools     # WebMCP tools, approval gate & prompt-injection security checks
+npm run test:tools     # WebMCP tool dispatch + surface sync, against a test double
+npm run test:gate      # The REAL approval gate in src/main.js, under a DOM harness
 
 # Start local server
 npm run dev
 ```
 Open **[http://localhost:5173](http://localhost:5173)** in your browser.
+
+### What each suite does and does not prove
+
+`src/main.js` resolves its DOM references at module scope, so for most of this project's
+life no Node test could import it — `test:tools` drives a test double and therefore proves
+the tool *contract*, not the gate. `test:gate` closes that: `src/testdom.js` builds a DOM
+from the real `index.html` (an element id that `main.js` references but `index.html` does
+not declare fails the run), imports `src/main.js` itself, and mints approval tokens only by
+dispatching click events on the approve button `renderApprovalQueue` actually creates.
+
+Its 45 checks are mutation-tested. Reverting the report-binding fix fails 4 of them;
+removing the finalized-card branch fails 1; dropping `caseId` validation fails 1. A green
+run means those behaviours are present, not merely that the suite ran.
 
 ---
 
