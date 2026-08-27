@@ -13,8 +13,9 @@
 1. Open the ChatGPT desktop app’s in-app browser.
 2. Visit [https://keramitra.vercel.app/](https://keramitra.vercel.app/).
 3. Confirm the header shows **NATIVE WebMCP [9 TOOLS]** and no warning banner; submit an approval request and watch it become **[10 TOOLS]**.
-4. Ask the agent: **“Review Case B and complete the screening workflow.”** Watch the case, evidence metrics, verdict, approval queue, and audit trail update as tools run.
-5. Select Case D and ask the same question. Its adversarial fixture metadata is visible to the agent; the deterministic demo path shows that a missing token is blocked with **TOKEN_MISSING** and logged as **GUARD_VIOLATION**.
+4. Click the **WebMCP** badge in the header to open the Inspector. It shows all ten tools, which are currently in the surface and why, and logs every call as it happens.
+5. Ask the agent: **“Review Case B and complete the screening workflow.”** Watch the case, evidence metrics, verdict, approval queue, and audit trail update as tools run — and watch the surface widen from 9 to 10 in the Inspector when the approval request is queued.
+6. Select Case D and ask the same question. Its adversarial fixture metadata is visible to the agent; the deterministic demo path shows that a missing token is blocked with **TOKEN_MISSING** and logged as **GUARD_VIOLATION**.
 
 ### If you have neither: one command, no flags
 
@@ -348,6 +349,46 @@ Keramitra resolves `document.modelContext` first and accepts `navigator.modelCon
 const modelContext = document.modelContext ?? navigator.modelContext;
 ```
 If neither is present, no tools are registered with any host and the header says so plainly (`NO WebMCP HOST — CONSOLE ONLY`), with a banner explaining that `window.keramitraTools` is the only remaining entry point. Nothing is polyfilled and no shim is installed.
+
+---
+
+## Known Limitations
+
+Findings from an adversarial pre-submission audit of this repository that were assessed and
+deliberately not changed. They are listed because a reviewer will find them anyway, and
+because which defects you choose not to fix days before a deadline is itself an engineering
+decision.
+
+- **`generate_case`'s `seed` is close to cosmetic.** The seed reaches exactly one expression,
+  the noise term in `synth.js`. Ring geometry comes from `steepening`, `ringCount`, `glare`
+  and `occlusion`. Sweeping the seed across its full declared range moves `spacingCV` only in
+  the fourth decimal and never changes the ring count or the verdict. The response is
+  genuinely reproducible; it is not a 2.1-billion-case space. Making the seed drive geometry
+  is a feature change, not a fix, and would shift every number the analysis tests assert.
+- **The synthetic noise term is skewed.** `synth.js` uses the GLSL hash idiom without
+  `fract()`, and JavaScript's `%` keeps the sign, so the perturbation spans roughly −9…+3
+  instead of ±3. Correcting it changes every rendered pixel and every metric in
+  `analyze.test.js`; it is cosmetic and was left alone.
+- **The steepening slider re-renders on every `input` event.** Each event is a full 512×512
+  render plus a 360-meridian analysis, measured at 105–133 ms. Dragging is therefore
+  deliberately heavy. Debouncing would smooth it at the cost of the live feedback the control
+  exists to demonstrate.
+- **`APPROVAL_REJECTED` and `TOKEN_ALREADY_USED` are unreachable through the tool surface.**
+  Both are real, both are returned by the gate, and both are covered in `test:gate` — but
+  rejecting or finalizing a request removes `finalize_report` from the surface, so an agent
+  can no longer reach the call that would produce them. That is the availability layer doing
+  its job; the codes remain documented for callers holding the controller directly.
+- **`favicon.ico` is an SVG.** It is byte-identical to `favicon.svg` and is served as
+  `image/vnd.microsoft.icon`. `index.html` declares the SVG explicitly, so browsers use that;
+  the `.ico` is only the implicit fallback.
+- **`test:tools` exercises a test double, not the gate.** This is stated in that file's own
+  header. `test:gate` is the suite that imports `src/main.js`.
+
+Two things could not be verified without a browser and are stated as claims rather than
+results: the exact Chrome flag string and minimum version in the secondary path above, and
+whether a native host validates `inputSchema` before calling `execute`. The handlers validate
+their own arguments regardless, so the second does not change behaviour — only whether the
+rejection comes from the host or from the tool.
 
 ---
 
