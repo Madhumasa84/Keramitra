@@ -93,6 +93,59 @@ await window.keramitraTools.invokeTool('finalize_report', { caseId: 'CASE_B', ap
 
 ---
 
+## Drive it from an OpenAI agent: the MCP bridge
+
+A second transport, for reviewers who have an MCP client but no WebMCP-enabled browser.
+
+```bash
+npm run dev                                   # terminal 1
+npm run mcp                                   # terminal 2 — MCP server on stdio
+# then open http://localhost:5173/?bridge=1
+```
+
+Point any MCP client at `node src/mcp-server.js` (see `mcp.config.example.json` for a
+copy-pasteable block) and it can drive the live tab.
+
+### Why it is a bridge and not a second implementation
+
+The obvious way to expose these tools over MCP is to run the application logic in Node and
+answer calls there. That would quietly destroy the only claim this project makes. A headless
+server has no browser and no clinician, so its approval gate would have to be simulated —
+and a simulated human-in-the-loop is not one.
+
+So the server owns no application logic at all. It relays calls over loopback HTTP to a live
+browser tab and returns whatever that tab's tools return:
+
+```
+MCP client ──stdio JSON-RPC──► src/mcp-server.js ──HTTP──► browser tab
+                                                              │
+                                                  window.keramitraTools
+                                                              │
+                                                the real gate, the real DOM
+```
+
+The agent is remote, the clinician is at the screen, and the gate between them is the same
+one the UI enforces. An agent with full MCP access can do every benign thing in the workflow
+and still cannot finalize a report until a person clicks **Approve** — which is a far
+stronger demonstration than a server that grants itself permission.
+
+### The tool list is not static
+
+Most MCP servers publish one fixed list. This one cannot, because the page's own surface is
+a function of its view. `tools/list` returns whatever that tab currently exposes, and the
+server emits `notifications/tools/list_changed` when it moves — so an MCP client watching the
+connection sees the list widen from 9 to 10 the moment a clinician's approval request is
+queued, and narrow again when the report is finalized. `npm run test:mcp` asserts exactly
+that, driving the server as a real stdio client.
+
+Zero dependencies: JSON-RPC over stdio is newline-delimited JSON and the relay is Node's own
+`http` module. The relay binds to `127.0.0.1` only, the page is the client rather than a
+listener, and the bridge is off unless the page is opened with `?bridge=1`, so an ordinary
+visitor to the deployed site never contacts it. Because the deployed site is HTTPS and the
+relay is loopback HTTP, the bridge is a local-development path: run it against `npm run dev`.
+
+---
+
 ## Local Reproduction
 
 Use Node.js `20.19+` or `22.12+` (the Vite version in this project requires one of these versions).
@@ -106,12 +159,13 @@ cd Keramitra
 npm install
 
 # Run automated test suites
-npm run test:all       # All four suites in sequence
+npm run test:all       # All five suites in sequence
 
 npm test               # Core image-analysis tests (analyze.js on synthetic pixels)
 npm run test:rules     # Load-bearing proof (real image vs. stub image)
 npm run test:tools     # WebMCP tool dispatch + surface sync, against a test double
 npm run test:gate      # The REAL approval gate in src/main.js, under a DOM harness
+npm run test:mcp       # Spawns the MCP server and drives it as a real stdio client
 
 # Start local server
 npm run dev

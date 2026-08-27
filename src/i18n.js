@@ -40,6 +40,8 @@ export const STRINGS = {
     inspectorWithheld: 'withheld',
     inspectorHostNative: 'Registered on document.modelContext — discoverable by an agent.',
     inspectorHostNone: 'No WebMCP host. Nothing is registered; these are reachable only from the console.',
+    inspectorBridgeOn: 'MCP bridge attached — an external agent can drive this tab',
+    inspectorBridgeWaiting: 'MCP bridge enabled, waiting for the local server',
 
     // Panels & Headers
     caseViewerTitle: 'Case viewer',
@@ -186,6 +188,8 @@ export const STRINGS = {
     inspectorWithheld: 'கிடைக்கவில்லை',
     inspectorHostNative: 'document.modelContext-இல் பதிவு செய்யப்பட்டுள்ளது — ஏஜென்ட் கண்டறியும்.',
     inspectorHostNone: 'WebMCP ஹோஸ்ட் இல்லை. எதுவும் பதிவு செய்யப்படவில்லை; கன்சோலில் மட்டுமே அணுகலாம்.',
+    inspectorBridgeOn: 'MCP பிரிட்ஜ் இணைக்கப்பட்டது — வெளி ஏஜென்ட் இந்த தாவலை இயக்கலாம்',
+    inspectorBridgeWaiting: 'MCP பிரிட்ஜ் இயக்கப்பட்டது, சர்வருக்காகக் காத்திருக்கிறது',
 
     // Panels & Headers
     caseViewerTitle: 'கண் பார்வை படம்',

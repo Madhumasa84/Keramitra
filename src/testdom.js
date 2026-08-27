@@ -180,6 +180,7 @@ export function installDom() {
     addEventListener: () => {},
     removeEventListener: () => {},
     getComputedStyle: (el) => el.style,
+    location: { href: 'http://localhost:5173/', search: '', pathname: '/', origin: 'http://localhost:5173' },
   };
   if (typeof globalThis.navigator === 'undefined') globalThis.navigator = {};
 

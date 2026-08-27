@@ -1,0 +1,14 @@
+{
+  "//": "Keramitra MCP bridge. Start the app first (npm run dev), then open",
+  "//2": "http://localhost:5173/?bridge=1 so the tab attaches to this server.",
+  "//3": "Copy the mcpServers block into your MCP client's config and set the absolute path.",
+  "mcpServers": {
+    "keramitra": {
+      "command": "node",
+      "args": ["/absolute/path/to/Keramitra/src/mcp-server.js"],
+      "env": {
+        "KERAMITRA_BRIDGE_PORT": "8787"
+      }
+    }
+  }
+}

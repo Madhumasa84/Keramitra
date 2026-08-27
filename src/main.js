@@ -9,6 +9,7 @@ import { analyzeRings } from './analyze.js';
 import { evaluateReferral, THRESHOLDS, REASON_CODES, VERDICTS } from './rules.js';
 import { registerWebMCPTools, unregisterWebMCPTools, syncWebMCPToolSurface, onToolCall, getToolCallLog, clearToolCallLog, describeToolAvailability } from './tools.js';
 import { STRINGS, t, generateEvidenceExplanation } from './i18n.js';
+import { connectBridge } from './bridge.js';
 
 // Structured Guard Error Codes (Exhaustive)
 export const GUARD_ERRORS = {
@@ -52,6 +53,7 @@ const state = {
   approvalQueue: [],
   auditTrail: [],
   generatedCase: null,
+  bridgeStatus: null,
 };
 
 // DOM Element References
@@ -1191,7 +1193,13 @@ function renderInspectorSurface() {
   }
   if (elements.inspectorHost) {
     const native = Boolean(window.keramitraTools?.hasNativeModelContext);
-    elements.inspectorHost.textContent = t(native ? 'inspectorHostNative' : 'inspectorHostNone', lang);
+    let hostText = t(native ? 'inspectorHostNative' : 'inspectorHostNone', lang);
+    const bridgeStatus = state.bridgeStatus;
+    if (bridgeStatus?.enabled) {
+      hostText += `  ·  ${t(bridgeStatus.attached ? 'inspectorBridgeOn' : 'inspectorBridgeWaiting', lang)}`;
+      if (bridgeStatus.calls > 0) hostText += ` (${bridgeStatus.calls})`;
+    }
+    elements.inspectorHost.textContent = hostText;
   }
 
   elements.inspectorToolList.innerHTML = '';
@@ -1357,9 +1365,14 @@ function updateWebMCPStatus(registrationResult) {
 }
 
 // Register only the tools that the initial app state needs; later transitions resync this surface.
+// Declared before registration because the surface-change callback below fires during
+// it, and a `const` in its temporal dead zone throws even under typeof.
+let bridge = null;
+
 const registrationResult = registerWebMCPTools(appController, (result) => {
   updateWebMCPStatus(result);
   if (elements.inspector && !elements.inspector.hidden) renderInspectorSurface();
+  if (bridge?.enabled) bridge.publishSurface();
 });
 updateWebMCPStatus(registrationResult);
 
@@ -1368,6 +1381,27 @@ onToolCall(() => {
   if (elements.inspector && !elements.inspector.hidden) renderInspector();
 });
 renderInspector();
+
+// Optional MCP bridge (?bridge=1). Off unless explicitly asked for, so an ordinary
+// visitor never contacts anything. A bridged agent reaches the tools through the
+// same invokeTool entry point the in-page host uses, and gains no privilege by it.
+bridge = connectBridge({
+  listTools: () => (window.keramitraTools ? window.keramitraTools.listTools() : []),
+  invokeTool: (name, args) => window.keramitraTools.invokeTool(name, args),
+  onStatus: (status) => {
+    state.bridgeStatus = status;
+    if (elements.inspector && !elements.inspector.hidden) renderInspectorSurface();
+  },
+});
+if (bridge.enabled) {
+  state.bridgeStatus = bridge.getStatus();
+  logAuditEvent({
+    type: 'BRIDGE_ATTACHED',
+    actor: 'SYSTEM',
+    action: 'MCP bridge enabled for this tab',
+    details: { session: bridge.session },
+  });
+}
 
 // Teardown registration on window unload
 window.addEventListener('beforeunload', () => {
