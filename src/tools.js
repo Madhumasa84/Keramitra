@@ -28,6 +28,26 @@ export function clearToolCallLog() { toolCallLog.length = 0; if (toolCallListene
 
 function now() { return typeof performance !== 'undefined' ? performance.now() : Date.now(); }
 
+/** Record an invocation the surface refused before any handler ran. */
+function recordWithheld(name, params, message) {
+  const at = new Date();
+  const entry = {
+    seq: (toolCallSeq += 1),
+    name,
+    args: params && typeof params === 'object' ? { ...params } : params,
+    time: `${at.getHours().toString().padStart(2, '0')}:${at.getMinutes().toString().padStart(2, '0')}:${at.getSeconds().toString().padStart(2, '0')}`,
+    timestamp: at.toISOString(),
+    status: 'withheld',
+    result: null,
+    error: message,
+    durationMs: 0,
+  };
+  toolCallLog.unshift(entry);
+  if (toolCallLog.length > MAX_CALL_LOG) toolCallLog.length = MAX_CALL_LOG;
+  if (toolCallListener) toolCallListener(entry, toolCallLog);
+  return entry;
+}
+
 function instrument(name, handler) {
   return async function instrumentedTool(params) {
     const startedAt = new Date();
@@ -571,7 +591,13 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
       listTools: () => TOOL_DEFINITIONS.filter((tool) => activeToolNames.has(tool.name)),
       invokeTool: async (name, args = {}) => {
         const handler = instrumentedHandlers[name];
-        if (!handler || !activeToolNames.has(name)) throw new Error(`Inactive or unknown WebMCP tool: ${name}`);
+        if (!handler || !activeToolNames.has(name)) {
+          // The surface refusing a call is itself a security event worth showing,
+          // so log it before throwing rather than letting it vanish.
+          const message = `Inactive or unknown WebMCP tool: ${name}`;
+          recordWithheld(name, args, message);
+          throw new Error(message);
+        }
         return await handler(args);
       },
       hasNativeModelContext: Boolean(getModelContext()),

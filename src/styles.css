@@ -1471,6 +1471,7 @@ html, body {
 }
 
 .inspector-call-status.status-blocked,
+.inspector-call-status.status-withheld,
 .inspector-call-status.status-rejected {
   color: var(--verdict-refer-text);
   border-color: var(--verdict-refer-border);

@@ -16,6 +16,19 @@
 4. Ask the agent: **“Review Case B and complete the screening workflow.”** Watch the case, evidence metrics, verdict, approval queue, and audit trail update as tools run.
 5. Select Case D and ask the same question. Its adversarial fixture metadata is visible to the agent; the deterministic demo path shows that a missing token is blocked with **TOKEN_MISSING** and logged as **GUARD_VIOLATION**.
 
+### If you have neither: one command, no flags
+
+```bash
+npm install && npm run demo:agent
+```
+
+Prints a narrated transcript of the whole workflow driven through the identical tool
+objects a native WebMCP host registers — discovery, pixel analysis, the rule engine,
+bilingual reasoning, three layers of the approval gate, the Case D fixture, and the audit
+trail. The only simulated part is the clinician's click, which is dispatched on the real
+approve button `renderApprovalQueue` creates. Every printed tool result is the value the
+tool actually returned.
+
 ### Secondary path: Chrome
 
 1. Use Chrome 149 or later (Canary or Dev channel).
@@ -238,6 +251,20 @@ Agent Request                     Clinician in UI                 Finalize Gate
                                                                        │
 [finalize_report]  ◄───────────────────────────────────────────────────┘
 ```
+
+It is enforced in three layers, and `npm run demo:agent` walks an agent into each of them:
+
+1. **Availability.** `finalize_report` is only in the tool surface while the active case has
+   a `PENDING` or `APPROVED` request. With no request there is no tool to call, and moving
+   the view to another case withdraws it again — before any token is examined.
+2. **Token.** The registry has exactly one writer: the click handler on the approve button
+   in `src/main.js`. No tool call can mint, and `request_approval` deliberately returns a
+   `requestId` that is not a token. Case binding, single use and a 300 s expiry are checked
+   on every call.
+3. **Body.** The finalized report is read from the approval record the token was minted
+   from, never from live application state, so an agent that moves the view between the
+   approval and the finalize still gets a report describing what the clinician signed off.
+   This layer is regression-tested in `npm run test:gate`.
 
 ### Security Failure Modes and Error Hierarchy
 

@@ -211,6 +211,21 @@ const logged = tools.getCallLog();
 check('Call log records tool, args, status and duration', Boolean(logged[0].name && logged[0].status && typeof logged[0].durationMs === 'number' && logged[0].args));
 check('Instrumentation preserves rejection: the error is still thrown', logged[0].status === 'rejected' && Boolean(logged[0].error));
 
+// A call the surface refuses never reaches a handler, so it has to be logged separately
+// or the most important security event would be missing from the Inspector.
+appController.loadCase('CASE_C');   // its only requests are FINALIZED and REJECTED
+const activeForC = appController.getState().approvalQueue
+  .filter((i) => i.caseId === 'CASE_C' && ['PENDING', 'APPROVED'].includes(i.status));
+check('Precondition: CASE_C has no active approval request', activeForC.length === 0);
+check('So finalize_report is not in the surface', !tools.listTools().some((t) => t.name === 'finalize_report'));
+
+const beforeWithheld = tools.getCallLog().length;
+try { await tools.invokeTool('finalize_report', { caseId: 'CASE_C', approvalToken: null }); } catch { /* expected */ }
+const withheldEntry = tools.getCallLog()[0];
+check('A call the surface withholds is still logged', tools.getCallLog().length === beforeWithheld + 1 && withheldEntry.name === 'finalize_report', withheldEntry.status);
+check('Withheld calls are marked, not silently dropped', withheldEntry.status === 'withheld' && Boolean(withheldEntry.error));
+check('Withheld calls render as blocked in the Inspector', callRows()[0].classList.contains('is-blocked'));
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + SEP);
 if (failures === 0) {

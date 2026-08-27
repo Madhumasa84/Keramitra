@@ -11,7 +11,8 @@
     "test:rules": "node src/rules.test.js",
     "test:tools": "node src/tools.test.js",
     "test:gate": "node src/gate.test.js",
-    "test:all": "npm test && npm run test:rules && npm run test:tools && npm run test:gate"
+    "test:all": "npm test && npm run test:rules && npm run test:tools && npm run test:gate",
+    "demo:agent": "node src/demo.js"
   },
   "devDependencies": {
     "vite": "^8.2.2"

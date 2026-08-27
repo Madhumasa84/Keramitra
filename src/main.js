@@ -1247,7 +1247,7 @@ function renderInspectorCallLog() {
 
   log.forEach((entry) => {
     const item = document.createElement('div');
-    const blocked = entry.status === 'blocked' || entry.status === 'rejected' || entry.status === 'error';
+    const blocked = ['blocked', 'rejected', 'withheld', 'error'].includes(entry.status);
     item.className = `inspector-call ${blocked ? 'is-blocked' : ''}`;
 
     const head = document.createElement('div');
