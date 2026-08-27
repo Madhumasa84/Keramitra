@@ -121,6 +121,7 @@ document.modelContext.registerTool({
 });
 ~~~
 All tool input schemas are JSON objects with `additionalProperties: false`; the table shows the accepted properties, types, ranges, and required fields.
+The handlers enforce these themselves rather than relying on the host to validate: an unknown `caseId`, a `GEN_<seed>` id that is not the active view, a missing required argument, or a `language` outside `en | ta` is rejected with a structured error instead of being coerced to a default.
 
 
 `PresetId` is `CASE_A | CASE_B | CASE_C | CASE_D`. `ActiveCaseId` is the loaded preset or the currently generated `GEN_<positive integer>` case. A generated ID is valid only while that generated case is the active view.

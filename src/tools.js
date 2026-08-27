@@ -14,6 +14,36 @@ let toolSurfaceListener = null;
 let activeToolNames = new Set();
 const ALWAYS_AVAILABLE_TOOL_NAMES = ['list_cases', 'load_case', 'generate_case'];
 const CASE_SCOPED_TOOL_NAMES = ['analyze_rings', 'get_measurements', 'set_measurements', 'evaluate_referral', 'explain_evidence', 'request_approval'];
+const PRESET_CASE_IDS = ['CASE_A', 'CASE_B', 'CASE_C', 'CASE_D'];
+/**
+ * Resolve a caseId argument against the declared schemas. Presets are always valid;
+ * a GEN_<n> id is valid only while that generated case is the active view, which is
+ * what the README documents. Anything else is rejected instead of being rendered as
+ * a fabricated case with whatever biometrics happened to be loaded.
+ */
+function resolveCaseId(controller, caseId, { required = false, toolName = 'tool' } = {}) {
+  const activeCase = controller.getState().currentCase;
+  if (caseId === undefined || caseId === null) {
+    if (required) throw new Error(`Invalid input for '${toolName}': 'caseId' is required.`);
+    return activeCase;
+  }
+  if (typeof caseId !== 'string') {
+    throw new Error(`Invalid input for '${toolName}': 'caseId' must be a string (received ${typeof caseId}).`);
+  }
+  if (PRESET_CASE_IDS.includes(caseId)) return caseId;
+  if (/^GEN_[1-9][0-9]*$/.test(caseId)) {
+    if (caseId === activeCase) return caseId;
+    throw new Error(
+      `Invalid input for '${toolName}': generated case '${caseId}' is not the active view ` +
+      `(active: '${activeCase}'). Generated cases are only addressable while active; ` +
+      `call generate_case with the same seed to recreate it.`
+    );
+  }
+  throw new Error(
+    `Invalid input for '${toolName}': unknown caseId '${caseId}'. ` +
+    `Expected one of ${PRESET_CASE_IDS.join(', ')} or the active GEN_<seed> case.`
+  );
+}
 function getModelContext() {
   return typeof document !== 'undefined' ? (document.modelContext ?? (typeof navigator !== 'undefined' ? navigator.modelContext : null)) : null;
 }
@@ -313,7 +343,14 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     },
 
     load_case: async (params) => {
-      const caseId = params?.caseId || CASES.CASE_A;
+      const caseId = params?.caseId;
+      if (typeof caseId !== 'string' || !PRESET_CASE_IDS.includes(caseId)) {
+        throw new Error(
+          `Invalid input for 'load_case': 'caseId' is required and must be one of ` +
+          `${PRESET_CASE_IDS.join(', ')} (received ${JSON.stringify(caseId)}). ` +
+          `Use generate_case for parametric synthetic cases.`
+        );
+      }
       const res = controller.loadCase(caseId);
       const meta = CASE_METADATA[caseId] || {};
       return {
@@ -332,8 +369,9 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     },
 
     analyze_rings: async (params) => {
-      if (params?.caseId && params.caseId !== controller.getState().currentCase) {
-        controller.loadCase(params.caseId);
+      const caseId = resolveCaseId(controller, params?.caseId, { toolName: 'analyze_rings' });
+      if (caseId !== controller.getState().currentCase) {
+        controller.loadCase(caseId);
       }
       const imageResult = controller.analyzeActiveCase();
       return {
@@ -348,8 +386,9 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     },
 
     get_measurements: async (params) => {
-      if (params?.caseId && params.caseId !== controller.getState().currentCase) {
-        controller.loadCase(params.caseId);
+      const caseId = resolveCaseId(controller, params?.caseId, { toolName: 'get_measurements' });
+      if (caseId !== controller.getState().currentCase) {
+        controller.loadCase(caseId);
       }
       const measurements = controller.getMeasurements();
       return {
@@ -359,7 +398,8 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     },
 
     set_measurements: async (params) => {
-      const { caseId, K1, K2, axis, pachymetry, cylinder } = params || {};
+      const { K1, K2, axis, pachymetry, cylinder } = params || {};
+      const caseId = resolveCaseId(controller, params?.caseId, { required: true, toolName: 'set_measurements' });
       const updates = Object.fromEntries(
         Object.entries({ K1, K2, axis, pachymetry, cylinder })
           .filter(([, value]) => value !== undefined)
@@ -370,8 +410,9 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
       return controller.generateCase(params || {}, 'AGENT');
     },
     evaluate_referral: async (params) => {
-      if (params?.caseId && params.caseId !== controller.getState().currentCase) {
-        controller.loadCase(params.caseId);
+      const caseId = resolveCaseId(controller, params?.caseId, { toolName: 'evaluate_referral' });
+      if (caseId !== controller.getState().currentCase) {
+        controller.loadCase(caseId);
       }
       const referralResult = controller.evaluateActiveReferral();
       return {
@@ -383,8 +424,11 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     },
 
     explain_evidence: async (params) => {
-      const caseId = params?.caseId || controller.getState().currentCase;
-      const language = params?.language || 'en';
+      const caseId = resolveCaseId(controller, params?.caseId, { toolName: 'explain_evidence' });
+      const language = params?.language;
+      if (!['en', 'ta'].includes(language)) {
+        throw new Error(`Invalid input for 'explain_evidence': 'language' is required and must be "en" or "ta" (received ${JSON.stringify(language)}).`);
+      }
       if (caseId !== controller.getState().currentCase) {
         controller.loadCase(caseId);
       }
@@ -407,7 +451,7 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     },
 
     request_approval: async (params) => {
-      const caseId = params?.caseId || controller.getState().currentCase;
+      const caseId = resolveCaseId(controller, params?.caseId, { required: true, toolName: 'request_approval' });
       const proposedAction = params?.proposedAction || 'Clinical review';
       const queueItem = controller.queueReferralRequest({ caseId, proposedAction });
       return {
@@ -420,7 +464,8 @@ export function registerWebMCPTools(controller, onSurfaceChange = null) {
     },
 
     finalize_report: async (params) => {
-      const { caseId, approvalToken } = params || {};
+      const { approvalToken } = params || {};
+      const caseId = resolveCaseId(controller, params?.caseId, { required: true, toolName: 'finalize_report' });
       const result = controller.finalizeReport({ caseId, approvalToken });
       return result;
     },
